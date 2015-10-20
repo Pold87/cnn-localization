@@ -71,7 +71,6 @@ for i = 0, trainImaNumber * 2 - 1 do
 end
 
 
-
 -- Split the data into train and test images
 
 -- load train data: 2416 images
@@ -142,6 +141,10 @@ trainset.label:add(-mean_target)
 stdv_target = trainset.label:std()
 trainset.label:div(stdv_target)
    
+
+image.display(trainset.data[{{400, 500}}])
+
+
 
 -- torch.save('train_normalized.t7', trainset)
 --torch.save('test_normalized.t7', testset)
@@ -254,7 +257,6 @@ model:add(inception( 576, {{ 96},{128,192},{160,192},{'avg', 96}})) -- 4(d)
    fb1:add(nn.SpatialConvolutionMM(192,128,3,3,1,1,1,1))      --  13 ->  13
    fb1:add(nn.ReLU())
    fb1:add(nn.SpatialMaxPooling(3,3,2,2))                   -- 13 -> 6
-
 
 
 
@@ -389,7 +391,7 @@ learningRate = 5e-3,
 -- but should typically be determinined using cross-correlation.
 
 -- we cycle 1e4 times over our training data
-for i = 1,1e3 do
+for i = 1,2 do
 
    -- this variable is used to estimate the average loss
    current_loss = 0
