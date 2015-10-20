@@ -1,4 +1,7 @@
 *~
 *#
 .*
+.ipynb_checkpoints/
 !/.gitignore
+*.t7
+scratch/
