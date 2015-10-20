@@ -6,3 +6,4 @@ tutorials/
 !/.gitignore
 *.t7
 scratch/
+*.ipynb
