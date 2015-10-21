@@ -6,7 +6,7 @@ require 'image'
 require 'csvigo'
 require 'qtwidget'
 
-src = image.load("../draug/img/dice.jpg")
+src = image.load("../data/dice.jpg")
 
 amount_pics = 300
 
