@@ -1,4 +1,5 @@
 require 'nn'
+require 'nnx'
 require 'clnn'
 require 'optim'
 require 'ffmpeg'
@@ -6,12 +7,19 @@ require 'image'
 require 'csvigo'
 require 'qtwidget'
 
+-- Settings
 src = image.load("../data/dice.jpg")
+img_folder = "../../draug/genimgs/"
+use_opencl = false
+max_iterations = 1
 
-amount_pics = 300
+-- Amount of synthetic views
+amount_pics = 50
+img_width = 224 / 2
+img_height = 224 / 2
 
 -- Read CSV and convert to tensor
-csv_file = csvigo.load("../draug/targets.csv")
+csv_file = csvigo.load("../../draug/targets.csv")
 target_x = torch.Tensor(csv_file.x)
 
 
@@ -58,28 +66,32 @@ function display_box(img, x1, y1, x2, y2, width, height)
     return win
 end
 
+x_range = img_width * 2
+
+-- Start by predicting the x coordinate
 trainset = {
-   data = torch.Tensor(amount_pics, 3, 224, 224),
-   label = torch.DoubleTensor(amount_pics, 224),
+   data = torch.Tensor(amount_pics, 3, img_width, img_height),
+   label = torch.DoubleTensor(amount_pics, x_range),
    size = function() return amount_pics end
 }
-
 
 -- Load train data
 
 for i=1, amount_pics do
 
-   img = image.load("../draug/genimgs/" .. i .. ".png")
+   img = image.load(img_folder .. (i - 1) .. ".png")
+
+   img = image.scale(img, img_width, img_height)
 
    true_x = target_x[i]
-   int_true_x = math.min(math.floor(true_x), 224)
+   int_true_x = math.min(math.floor(true_x),  x_range)
 
-   label = torch.Tensor(224)
-
-   print(int_true_x)
+   label = torch.Tensor(x_range):fill(0)
 
    label[int_true_x] = 1
 
+   --print("True x is " .. true_x .. "... and rounded " .. int_true_x)
+   
    trainset.data[i] = img
    trainset.label[i] = label
    --trainset.label[i] = int_true_x
@@ -87,10 +99,9 @@ for i=1, amount_pics do
 end
 
 
-
 mean = {} -- store the mean, to normalize the test set in the future
 stdv  = {} -- store the standard-deviation for the future
-for i=1,3 do -- over each image channel
+for i=1, 3 do -- over each image channel
     mean[i] = trainset.data[{ {}, {i}, {}, {}  }]:mean() -- mean estimation
     print('Channel ' .. i .. ', Mean: ' .. mean[i])
     trainset.data[{ {}, {i}, {}, {}  }]:add(-mean[i]) -- mean subtraction
@@ -133,41 +144,33 @@ end
 
 --print(trainset.label)
 
-net = nn.Sequential()
-net:add(nn.SpatialConvolution(3, 6, 5, 5)) -- 3 input image channels, 6 output channels, 5x5 convolution kernel
-net:add(nn.SpatialMaxPooling(2,2,2,2))     -- A max-pooling operation that looks at 2x2 windows and finds the max.
-net:add(nn.SpatialConvolution(6, 16, 5, 5))
-net:add(nn.SpatialMaxPooling(2,2,2,2))
-net:add(nn.View(16* 53 * 53))                    -- reshapes from a 3D tensor of 16x5x5 into 1D tensor of 16*5*5
-net:add(nn.Linear(16* 53 * 53, 16 * 29))             -- fully connected layer (matrix multiplication between input and weights)
-net:add(nn.Linear(16 * 29, 224))             -- fully connected layer (matrix multiplication between input and weights)
--- net:add(nn.Linear(120, 2))2
---net:add(nn.Linear(84, amount_pics))                   -- 10 is the number of outputs of the network (in this case, 10 digits)
-net:add(nn.LogSoftMax())                     -- converts the output to a log-probability. Useful for classification problems
+input_size = 3 * img_width * img_height
 
--- criterion = nn.MSECriterion()
-criterion = nn.BCECriterion()
--- criterion = nn.ClassNLLCriterion()
+net = nn.Sequential()
+net:add(nn.View(input_size))
+net:add(nn.Linear(input_size, x_range))
+net:add(nn.LogSoftMax())
+criterion = nn.DistKLDivCriterion()
 
 -- Move to OpenCL
-
-net = net:cl()
-criterion = criterion:cl()
-trainset.data = trainset.data:cl()
-trainset.label = trainset.label:cl()
---mean_target = mean_target:cl()
---stdv_target = stdv_target:cl()
+if use_opencl then
+   net = net:cl()
+   criterion = criterion:cl()
+   trainset.data = trainset.data:cl()
+   trainset.label = trainset.label:cl()
+   mean_target = mean_target:cl()
+   stdv_target = stdv_target:cl()
+end
 
 trainer = nn.StochasticGradient(net, criterion)
 trainer.learningRate = 0.001
-trainer.maxIteration = 10
-
---print(trainset.data[5])
+trainer.maxIteration = max_iterations
 
 trainer:train(trainset)
 
 -- Testing
 
+--[[
 for i = 1, 10 do
     
     -- Ground truth
@@ -180,4 +183,16 @@ for i = 1, 10 do
     win = display_box(src, x1, x2, pred[1], pred[2], 128, 128)
     sleep(1.5)
     win:close()
+end
+--]]
+
+
+
+for i = 1, 10 do
+
+   estimations = net:forward(trainset.data[i])
+
+   print("Ground truth", trainset.label[i])
+   print("Estimations", estimations:exp())
+   
 end
