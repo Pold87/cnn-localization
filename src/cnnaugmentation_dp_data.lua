@@ -92,6 +92,10 @@ function UAVCoordinates:loadData(file_name)
    return torch.load(file_name)
 end
 
+function UAVCoordinates:(file_name)
+   return torch.load(file_name)
+end
+
 
 function UAVCoordinates:createTrainSet(data, which_set)
 
