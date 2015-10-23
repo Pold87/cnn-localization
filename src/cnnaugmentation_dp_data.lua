@@ -1,6 +1,6 @@
 require 'dp'
 
-local UAVCoordinates, DataSource = torch.class("dp.DroneCoordinates", "dp.DataSource")
+local UAVCoordinates, DataSource = torch.class("dp.UAVCoordinates", "dp.DataSource")
 UAVCoordinates.isUAVCoordinates = true
 
 UAVCoordinates._name = 'UAVCoordinates'
@@ -205,3 +205,7 @@ function FeedbackUAV:report()
       n_sample = self._n_sample
    }
 end
+
+return {
+   UAVCoordinates = UAVCoordinates,
+}
