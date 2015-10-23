@@ -6,21 +6,25 @@ require 'ffmpeg'
 require 'image'
 require 'csvigo'
 require 'qtwidget'
+require 'dp'
 
 -- Settings
 src = image.load("../data/dice.jpg")
 img_folder = "../../draug/genimgs/"
 use_opencl = false
-max_iterations = 1
+max_iterations = 50
 
 -- Amount of synthetic views
-amount_pics = 50
+amount_pics = 300
+amount_test_pics = 70
 img_width = 224 / 2
 img_height = 224 / 2
 
 -- Read CSV and convert to tensor
 csv_file = csvigo.load("../../draug/targets.csv")
 target_x = torch.Tensor(csv_file.x)
+target_y = torch.Tensor(csv_file.y)
+target_z = torch.Tensor(csv_file.z)
 
 
 function normalized_to_raw(pred, mean_target, stdv_target)
@@ -67,34 +71,93 @@ function display_box(img, x1, y1, x2, y2, width, height)
 end
 
 x_range = img_width * 2
+y_range = img_height * 2
+total_range = 300
 
 -- Start by predicting the x coordinate
 trainset = {
    data = torch.Tensor(amount_pics, 3, img_width, img_height),
-   label = torch.DoubleTensor(amount_pics, x_range),
+   label = torch.DoubleTensor(amount_pics, 2, total_range),
    size = function() return amount_pics end
 }
 
 -- Load train data
 
-for i=1, amount_pics do
+for i = 1, amount_pics do
 
    img = image.load(img_folder .. (i - 1) .. ".png")
 
    img = image.scale(img, img_width, img_height)
 
    true_x = target_x[i]
-   int_true_x = math.min(math.floor(true_x),  x_range)
+   true_x = true_x + 112
+   int_true_x = math.min(math.floor(true_x),  total_range)
 
-   label = torch.Tensor(x_range):fill(0)
 
-   label[int_true_x] = 1
+   true_y = target_y[i]
+   true_y = true_y + 112
+   int_true_y = math.min(math.floor(true_y),  total_range)
+
+
+   --true_z = target_z[i]
+   --int_true_z = math.min(math.floor(true_z),  total_range)
+
+
+   label = torch.Tensor(2, total_range):fill(0)
+
+   label[1][int_true_x] = 1
+   label[2][int_true_y] = 1
+   --label[3][int_true_z] = 1
 
    --print("True x is " .. true_x .. "... and rounded " .. int_true_x)
    
    trainset.data[i] = img
    trainset.label[i] = label
    --trainset.label[i] = int_true_x
+    
+end
+
+
+-- Start by predicting the x coordinate
+testset = {
+   data = torch.Tensor(amount_test_pics, 3, img_width, img_height),
+   label = torch.DoubleTensor(amount_pics, 2, total_range),
+   size = function() return amount_pics end
+}
+
+for i = 1, amount_test_pics do
+
+   i_prime = amount_pics + i
+
+   img = image.load(img_folder .. (i_prime - 1) .. ".png")
+
+   img = image.scale(img, img_width, img_height)
+
+   true_x = target_x[i_prime]
+   true_x = true_x + 112
+   int_true_x = math.min(math.floor(true_x),  x_range)
+
+
+   true_y = target_y[i_prime]
+   true_y = true_y + 112
+   int_true_y = math.min(math.floor(true_y),  total_range)
+
+
+   true_z = target_z[i_prime]
+   int_true_z = math.min(math.floor(true_z),  total_range)
+
+
+   label = torch.Tensor(2, total_range):fill(0)
+
+   label[1][int_true_x] = 1
+   label[2][int_true_y] = 1
+   --label[3][int_true_z] = 1
+
+
+   --print("True x is " .. true_x .. "... and rounded " .. int_true_x)
+   
+   testset.data[i] = img
+   testset.label[i] = label
     
 end
 
@@ -126,6 +189,23 @@ for i=1, 0 do -- over x, y, height, width
     trainset.label[{{}, {i}}]:div(stdv_target[i]) -- std scaling
 end
 
+
+-- TESTSET
+
+mean_test = {} -- store the mean, to normalize the test set in the future
+stdv_test  = {} -- store the standard-deviation for the future
+for i=1, 3 do -- over each image channel
+    mean[i] = testset.data[{ {}, {i}, {}, {}  }]:mean() -- mean estimation
+    print('Channel ' .. i .. ', Mean: ' .. mean[i])
+    testset.data[{ {}, {i}, {}, {}  }]:add(-mean[i]) -- mean subtraction
+    
+    stdv[i] = testset.data[{ {}, {i}, {}, {}  }]:std() -- std estimation
+    print('Channel ' .. i .. ', Standard Deviation: ' .. stdv[i])
+    testset.data[{ {}, {i}, {}, {}  }]:div(stdv[i]) -- std scaling
+end
+
+
+
 function trainset:size() 
     return self.data:size(1) 
 end
@@ -138,19 +218,40 @@ setmetatable(trainset,
 
 trainset.data = trainset.data:double() -- convert the data from a ByteTensor to a DoubleTensor.
 
-function trainset:size() 
+
+function testset:size() 
     return self.data:size(1) 
 end
+
+setmetatable(testset, 
+    {__index = function(t, i) 
+                    return {t.data[i], t.label[i]} 
+                end}
+);
+
+testset.data = testset.data:double() -- convert the data from a ByteTensor to a DoubleTensor.
 
 --print(trainset.label)
 
 input_size = 3 * img_width * img_height
 
 net = nn.Sequential()
-net:add(nn.View(input_size))
-net:add(nn.Linear(input_size, x_range))
-net:add(nn.LogSoftMax())
-criterion = nn.DistKLDivCriterion()
+net:add(nn.SpatialConvolution(3, 6, 5, 5))
+net:add(nn.SpatialMaxPooling(2, 2, 2, 2)) 
+net:add(nn.SpatialConvolution(6, 16, 5, 5))
+net:add(nn.SpatialMaxPooling(2,2,2,2))
+net:add(nn.View(16 * 25 * 25))
+net:add(nn.Linear(16 * 25 * 25, 2 * total_range))
+net:add(nn.Reshape(2,total_range))
+--net:add(nn.LogSoftMax())
+net:add(nn.MultiSoftMax())
+
+
+logModule = nn.Sequential()
+logModule:add(nn.AddConstant(0.00000001)) -- fixes log(0)=NaN errors
+logModule:add(nn.Log())
+
+criterion = nn.ModuleCriterion(nn.DistKLDivCriterion(), logModule, nn.Convert())
 
 -- Move to OpenCL
 if use_opencl then
@@ -187,12 +288,50 @@ end
 --]]
 
 
+function visual_comparison(ground_truth, preds)
 
-for i = 1, 10 do
+   
+   local ground_truth_normalized = ground_truth * 255
+   local preds_normalized = preds * 255
+
+   local height = 100
+   local width_per_cell = 5
+
+   -- local 2d_truth = torch.Tensor(height, preds:size() * width_per_cell):fill(0)
+   local sep_2d = torch.Tensor(10, preds:size(1)):fill(130)
+   -- local 2d_preds = torch.Tensor(height, preds:size() * width_per_cell):fill(0)
+
+   truth_2d = torch.repeatTensor(ground_truth_normalized, height, 1)
+   preds_2d = torch.repeatTensor(preds_normalized, height, 1)
+
+   pic = torch.cat({truth_2d, sep_2d, preds_2d}, 1)
+
+   image.display(pic)
+
+end
+
+
+--[[for i = 1, 20 do
 
    estimations = net:forward(trainset.data[i])
 
    print("Ground truth", trainset.label[i])
    print("Estimations", estimations:exp())
+
+   visual_comparison(trainset.label[i], estimations:exp())
+   sleep(1.5)
+   
+end
+--]]
+
+for i = 1, 20 do
+
+   estimations = net:forward(testset.data[i])
+
+   print("Ground truth", testset.label[i])
+   print("Estimations", estimations[1]:exp())
+
+   visual_comparison(testset.label[1][i], estimations[1]:exp())
+   -- sleep(1.5)
    
 end
