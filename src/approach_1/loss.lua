@@ -113,6 +113,9 @@ elseif opt.loss == 'multi' then
       criterion = nn.ModuleCriterion(nn.DistKLDivCriterion(), logModule, nn.Convert())
    end
 
+elseif opt.loss == 'simple' then
+   model:add(nn.LogSoftMax())
+   criterion = nn.DistKLDivCriterion()
 
 else
 

@@ -5,5 +5,6 @@
 tutorials/
 !/.gitignore
 *.t7
+*.net
 scratch/
 *.ipynb

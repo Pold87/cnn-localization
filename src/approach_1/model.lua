@@ -140,7 +140,13 @@ elseif opt.model == 'volker' then
    model:add(nn.SpatialMaxPooling(2,2,2,2))
    model:add(nn.View(16 * 25 * 25))
    model:add(nn.Linear(16 * 25 * 25, opt.dof * total_range))
-   model:add(nn.Reshape(opt.dof, total_range))
+--   model:add(nn.Reshape(opt.dof, total_range))
+
+elseif opt.model == 'volkersimple' then
+
+   model = nn.Sequential()
+   model:add(nn.View(112 * 112 * 3))
+   model:add(nn.Linear(112 * 112 * 3, opt.dof * total_range))
 
 else
 

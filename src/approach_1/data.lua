@@ -3,6 +3,7 @@ require 'nn'
 require 'image'
 require 'math'
 require 'csvigo'
+require 'distributions'
 
 
 -- parse command line arguments
@@ -47,7 +48,7 @@ img_height = 224 / 2
 
 x_range = img_width * 2
 y_range = img_height * 2
-total_range = 300
+total_range = 100
 
 -- Read CSV and convert to tensor
 csv_file = csvigo.load("../../../draug/targets.csv")
@@ -145,6 +146,39 @@ end
 
 function makeTargets1DNew(y, stdv)
 
+   Y = torch.FloatTensor(total_range):zero()
+
+   for i = 1, Y:size() do
+
+      local val = Y[i]
+      val = distributions.norm.pdf(i, y, stdv)
+   end
+
+   return Y
+   
+
+end
+
+function set_small_nums_to_zero(x)
+   val = 0
+   if x > 0.01 then
+      val = x
+   end   
+   return val
+end      
+
+function makeTargets1DNewImage(y, stdv)
+
+   mean_pos = y / total_range
+   
+   Y = image.gaussian1D({size=total_range,
+			 mean=mean_pos,
+			 sigma=.007,
+			 normalize=true})
+   Y:apply(set_small_nums_to_zero)
+
+   return Y
+
 end
 
 -- Load train data (incl. Gaussian normalization)
@@ -165,7 +199,7 @@ function load_data(dataset, start_pic_num, pics)
       img = image.scale(img, img_width, img_height)
    
       true_x = target_x[i_prime]
-      true_x = true_x + 112
+      true_x = true_x / 4
       int_true_x = math.min(math.floor(true_x),  total_range)
       
 
@@ -178,7 +212,6 @@ function load_data(dataset, start_pic_num, pics)
       -- Degrees of freedom
       if opt.dof == 1 then
          label[i] = true_x
-         print(true_x)
       else
          label[i][1] = true_x
       end
@@ -189,10 +222,14 @@ function load_data(dataset, start_pic_num, pics)
       i_prime = i_prime + 1
 
       if opt.dof == 1 then
-         dataset.label[i] = makeTargets1D(label, 1)
-         print(dataset.label[i])
+	 dataset.label[i] = makeTargets1DNewImage(true_x, .15)
+
+	 -- DEBUG ONLY
+	 -- dataset.label[i]:fill(0)
+	 -- dataset.label[i][1][1] = 1
+	 
       end
-      
+       
    end
 
 --      if opt.dof ~= 1 then
@@ -204,6 +241,7 @@ end
 load_data(trainset, 1, trsize)
 load_data(testset, 201, tesize)
 
+print(trainset.label)
 
 function trainset:size() 
     return self.data:size(1) 
@@ -319,9 +357,9 @@ if opt.visualize then
 --   image.display(first256Samples_u)
 --   image.display(first256Samples_v)
    if itorch then
-      first256Samples_y = trainData.data[{ {1,256},1 }]
-      first256Samples_u = trainData.data[{ {1,256},2 }]
-      first256Samples_v = trainData.data[{ {1,256},3 }]
+      first256Samples_y = trainset.data[{ {1,3},1 }]
+      first256Samples_u = trainset.data[{ {1,3},2 }]
+      first256Samples_v = trainset.data[{ {1,3},3 }]
       itorch.image(first256Samples_y)
       itorch.image(first256Samples_u)
       itorch.image(first256Samples_v)

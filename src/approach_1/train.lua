@@ -39,11 +39,12 @@ end
 function to_classes(predictions, classes) 
 
    len = predictions:size()
+
    max, pos = predictions:max(1)
 
    width = len[1] / classes -- width of the bins
 
-   class = (math.floor(pos[1] / width)) + 1
+   class = (math.floor((pos[1] - 1) / width)) + 1
 
    return class
    
@@ -170,7 +171,8 @@ function train()
                           model:backward(inputs[i], df_do)
 
                           -- update confusion
-                          confusion:add(to_classes(output[1], 10), 
+
+                          confusion:add(to_classes(output, 10), 
                                         to_classes(targets[i][1], 10))
                        end
 
@@ -203,10 +205,40 @@ function train()
    if opt.plot then
       trainLogger:style{['% mean class accuracy (train set)'] = '-'}
       trainLogger:plot()
+      
    end
 
+   if (epoch - 1) % 10 == 0 then
+      if opt.visualize then
+	 if itorch then
+	    print '==> visualizing ConvNet filters'
+	 print('Layer 1 -- FIXME: lters:')
+	 print('Weights', model:get(1).weight)
+	 itorch.image(model:get(1).weight)
+	 -- print('Layer 2 filters:')
+	 --      image.display(model:get(5).weight)
+	 
+	 else
+	    print '==> visualizing ConvNet filters'
+	    print('Layer 1 filters:')
+	    print('Weights', model:get(3).weight)
+	    
+	    
+	    image.display({image=model:get(3).weight[{{}, {1}, {}, {}}], zoom=10, padding=10})
+	   
+	    
+	    --	 for i=1, model:get(1).weight:size(1) do
+	    --	    image.display(image.scale(model:get(1).weight[i], 7))
+	    --	 end
+	    --	 print('Layer 2 filters:')
+	    --      image.display(model:get(5).weight)
+	 end
+      end
+   end
+
+
    -- save/log current model
-   local filename = paths.concat(opt.save, 'model.net')
+   local filename = paths.concat(opt.save, 'model.t7')
    os.execute('mkdir -p ' .. sys.dirname(filename))
    print('==> saving model to '..filename)
    torch.save(filename, model)

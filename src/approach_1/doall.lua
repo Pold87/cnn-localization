@@ -30,11 +30,11 @@ cmd:text('Options:')
 cmd:option('-seed', 1, 'fixed input seed for repeatable experiments')
 cmd:option('-threads', 3, 'number of threads')
 -- data:
-cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
+cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
 -- model:
 cmd:option('-model', 'volker', 'type of model to construct: linear | mlp | convnet | volker')
 -- loss:
-cmd:option('-loss', 'multi', 'type of loss function to minimize: nll | mse | margin')
+cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | margin | simple')
 -- training:
 cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
 cmd:option('-plot', true, 'live plot')
@@ -46,6 +46,7 @@ cmd:option('-momentum', 0, 'momentum (SGD only)')
 cmd:option('-t0', 1, 'start averaging at t0 (ASGD only), in nb of epochs')
 cmd:option('-maxIter', 2, 'maximum nb of iterations for CG and LBFGS')
 cmd:option('-type', 'float', 'type: double | float | cuda')
+cmd:option('-visualize', true, 'visualize weights of the network (true | false)')
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
 cmd:text()
 opt = cmd:parse(arg or {})
