@@ -1,0 +1,2 @@
+* Add Gaussian noise
+* Use Adagrad instead of SGD
