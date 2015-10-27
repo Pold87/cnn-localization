@@ -172,6 +172,11 @@ function train()
 
                           -- update confusion
 
+                          print(output)
+
+                          print("to_classes(output, 10), ", to_classes(output, 10))
+                          print("to_classes(targets[i][1], 10) ", to_classes(targets[i][1], 10), "\n")
+
                           confusion:add(to_classes(output, 10), 
                                         to_classes(targets[i][1], 10))
                        end
@@ -222,16 +227,17 @@ function train()
 	    print '==> visualizing ConvNet filters'
 	    print('Layer 1 filters:')
 	    print('Weights', model:get(3).weight)
+
+            image.display(confusion:render())
 	    
 	    
-	    image.display({image=model:get(3).weight[{{}, {1}, {}, {}}], zoom=10, padding=10})
+	    image.display({image=model:get(3).weight[{{}, {1}, {}, {}}],
+                           zoom=10, 
+                           padding=10})
+
+            image.display(trainset.data[torch.random(trsize)])
 	   
 	    
-	    --	 for i=1, model:get(1).weight:size(1) do
-	    --	    image.display(image.scale(model:get(1).weight[i], 7))
-	    --	 end
-	    --	 print('Layer 2 filters:')
-	    --      image.display(model:get(5).weight)
 	 end
       end
    end

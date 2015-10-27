@@ -4,7 +4,7 @@ require 'torch'
 require 'nn'
 
 
-dev = 1
+dev = 0
 width = 320
 height = 240
 fps = 30
@@ -25,11 +25,10 @@ model = torch.load("results/model.t7")
 
 while true do
 
-   frame = cam:forward()  -- return the next frame available
+   frame = cam:forward():float()  -- return the next frame available
+
    frame = image.scale(frame, 112, 112)
 
-   print(frame)
-   
    image.display{win=win, image=frame}  -- display frame
 
    -- Define the normalization neighborhood:
@@ -40,7 +39,7 @@ while true do
    normalization = nn.SpatialContrastiveNormalization(1, neighborhood, 1):float()
    
    -- Normalize all channels locally:
-   for c in ipairs(3) do
+   for c = 1, 3 do
 	 frame[{ {c},{},{} }] = normalization:forward(frame[{ {c},{},{} }])
       end
 
@@ -48,7 +47,7 @@ while true do
    pred = model:forward(frame)
    max, pos = pred:max(1)
 
-   print(max, pos)
+   print(pos[1])
 
 end
 

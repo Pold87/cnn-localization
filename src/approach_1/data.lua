@@ -35,11 +35,11 @@ max_iterations = 50
 
 if opt.size == 'full' then
    print '==> using regular, full training data'
-   trsize = 200 -- training images
+   trsize = 800 -- training images
    tesize = 100 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
-   trsize = 30
+   trsize = 120
    tesize = 10
 end
 
@@ -173,9 +173,11 @@ function makeTargets1DNewImage(y, stdv)
    
    Y = image.gaussian1D({size=total_range,
 			 mean=mean_pos,
-			 sigma=.007,
+			 sigma=.015,
 			 normalize=true})
    Y:apply(set_small_nums_to_zero)
+
+   print(Y)
 
    return Y
 
@@ -199,7 +201,7 @@ function load_data(dataset, start_pic_num, pics)
       img = image.scale(img, img_width, img_height)
    
       true_x = target_x[i_prime]
-      true_x = true_x / 4
+      true_x = true_x + 50
       int_true_x = math.min(math.floor(true_x),  total_range)
       
 
@@ -239,9 +241,7 @@ function load_data(dataset, start_pic_num, pics)
 end
 
 load_data(trainset, 1, trsize)
-load_data(testset, 201, tesize)
-
-print(trainset.label)
+load_data(testset, 801, tesize)
 
 function trainset:size() 
     return self.data:size(1) 

@@ -134,9 +134,9 @@ elseif opt.model == 'convnet' then
 elseif opt.model == 'volker' then
 
    model = nn.Sequential()
-   model:add(nn.SpatialConvolution(3, 6, 5, 5))
+   model:add(nn.SpatialConvolution(3, 12, 5, 5))
    model:add(nn.SpatialMaxPooling(2, 2, 2, 2)) 
-   model:add(nn.SpatialConvolution(6, 16, 5, 5))
+   model:add(nn.SpatialConvolution(12, 16, 5, 5))
    model:add(nn.SpatialMaxPooling(2,2,2,2))
    model:add(nn.View(16 * 25 * 25))
    model:add(nn.Linear(16 * 25 * 25, opt.dof * total_range))

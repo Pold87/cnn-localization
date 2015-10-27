@@ -116,6 +116,7 @@ elseif opt.loss == 'multi' then
 elseif opt.loss == 'simple' then
    model:add(nn.LogSoftMax())
    criterion = nn.DistKLDivCriterion()
+--   criterion = nn.SmoothL1Criterion()
 
 else
 
