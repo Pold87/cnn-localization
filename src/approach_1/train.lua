@@ -34,27 +34,10 @@ if opt.type == 'cuda' then
 end
 
 
--- Take a 1D-tensor (e.g. with size 300), and split it into classes
--- For example, 1-30: class 1; 31 - 60: class 2; etc.
-function to_classes(predictions, classes) 
-
-   len = predictions:size()
-
-   max, pos = predictions:max(1)
-
-   width = len[1] / classes -- width of the bins
-
-   class = (math.floor((pos[1] - 1) / width)) + 1
-
-   return class
-   
-
-end
-
 ----------------------------------------------------------------------
 print '==> defining some tools'
 
-classes = {'1','2','3','4','5','6','7','8','9','10'}
+classes = {'1','2','3','4','5','6','7','8','9', '10'}
 
 -- This matrix records the current confusion across classes
 confusion = optim.ConfusionMatrix(classes)

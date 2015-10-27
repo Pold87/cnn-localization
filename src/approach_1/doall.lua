@@ -38,8 +38,8 @@ cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | ma
 -- training:
 cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
 cmd:option('-plot', true, 'live plot')
-cmd:option('-optimization', 'CG', 'optimization method: SGD | ASGD | CG | LBFGS')
-cmd:option('-learningRate', 1e-3, 'learning rate at t=0')
+cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
+cmd:option('-learningRate', 1e-2, 'learning rate at t=0')
 cmd:option('-batchSize', 3, 'mini-batch size (1 = pure stochastic)')
 cmd:option('-weightDecay', 0, 'weight decay (SGD only)')
 cmd:option('-momentum', 0, 'momentum (SGD only)')

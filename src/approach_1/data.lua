@@ -4,6 +4,7 @@ require 'image'
 require 'math'
 require 'csvigo'
 require 'distributions'
+require 'gnuplot'
 
 
 -- parse command line arguments
@@ -24,7 +25,7 @@ end
 
 -- Settings
 src = image.load("../../data/dice.jpg")
-img_folder = "../../../draug/genimgs/"
+img_folder = "../../data/genimgs/"
 use_opencl = false
 max_iterations = 50
 
@@ -39,7 +40,7 @@ if opt.size == 'full' then
    tesize = 100 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
-   trsize = 120
+   trsize = 30
    tesize = 10
 end
 
@@ -48,10 +49,10 @@ img_height = 224 / 2
 
 x_range = img_width * 2
 y_range = img_height * 2
-total_range = 100
+total_range = 350
 
 -- Read CSV and convert to tensor
-csv_file = csvigo.load("../../../draug/targets.csv")
+csv_file = csvigo.load("../../data/targets.csv")
 target_x = torch.Tensor(csv_file.x)
 target_y = torch.Tensor(csv_file.y)
 target_z = torch.Tensor(csv_file.z)
@@ -70,6 +71,47 @@ testset = {
    label = torch.FloatTensor(tesize, opt.dof, total_range),
    size = function() return tesize end
 }
+
+
+-- Take a 1D-tensor (e.g. with size 300), and split it into classes
+-- For example, 1-30: class 1; 31 - 60: class 2; etc.
+function to_classes(predictions, classes) 
+
+--   print(predictions)
+
+   len = predictions:size()
+   max, pos = predictions:max(1)
+   width = len[1] / classes -- width of the bins
+
+   class = (math.floor((pos[1] - 1) / width)) + 1
+
+   return class
+   
+
+end
+
+
+function visualize_data(targets)
+
+   print(targets)
+   hist = torch.histc(targets, 10)
+   gnuplot.hist(targets, 10, 1, 10)
+   print("Histogram", hist)
+
+end
+
+function all_classes(labels, num_classes)
+  s = labels:size(1)
+  tmp_classes = torch.Tensor(s):fill(0)
+
+  for i=1, labels:size(1) do
+    class = to_classes(labels[i][1], 10)  
+    tmp_classes[i] = class
+  end
+
+  return tmp_classes
+  
+end
 
 function normalized_to_raw(pred, mean_target, stdv_target)
     
@@ -177,8 +219,6 @@ function makeTargets1DNewImage(y, stdv)
 			 normalize=true})
    Y:apply(set_small_nums_to_zero)
 
-   print(Y)
-
    return Y
 
 end
@@ -201,7 +241,7 @@ function load_data(dataset, start_pic_num, pics)
       img = image.scale(img, img_width, img_height)
    
       true_x = target_x[i_prime]
-      true_x = true_x + 50
+      true_x = true_x - 50
       int_true_x = math.min(math.floor(true_x),  total_range)
       
 
@@ -213,7 +253,7 @@ function load_data(dataset, start_pic_num, pics)
 
       -- Degrees of freedom
       if opt.dof == 1 then
-         label[i] = true_x
+         label[i] = int_true_x
       else
          label[i][1] = true_x
       end
@@ -224,7 +264,7 @@ function load_data(dataset, start_pic_num, pics)
       i_prime = i_prime + 1
 
       if opt.dof == 1 then
-	 dataset.label[i] = makeTargets1DNewImage(true_x, .15)
+	 dataset.label[i] = makeTargets1DNewImage(int_true_x, .15)
 
 	 -- DEBUG ONLY
 	 -- dataset.label[i]:fill(0)
@@ -241,7 +281,12 @@ function load_data(dataset, start_pic_num, pics)
 end
 
 load_data(trainset, 1, trsize)
-load_data(testset, 801, tesize)
+--load_data(testset, 801, tesize)
+
+--print(visualize_data(target_x))
+--print(visualize_data(all_classes(trainset.label, 10)))
+
+
 
 function trainset:size() 
     return self.data:size(1) 
