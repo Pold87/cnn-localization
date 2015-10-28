@@ -36,7 +36,7 @@ max_iterations = 50
 
 if opt.size == 'full' then
    print '==> using regular, full training data'
-   trsize = 800 -- training images
+   trsize = 1000 -- training images
    tesize = 100 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
@@ -44,8 +44,8 @@ elseif opt.size == 'small' then
    tesize = 10
 end
 
-img_width = 224 / 2
-img_height = 224 / 2
+img_width = 224
+img_height = 224
 
 x_range = img_width * 2
 y_range = img_height * 2
@@ -241,7 +241,7 @@ function load_data(dataset, start_pic_num, pics)
       img = image.scale(img, img_width, img_height)
    
       true_x = target_x[i_prime]
-      true_x = true_x - 50
+      --true_x = true_x - 50
       int_true_x = math.min(math.floor(true_x),  total_range)
       
 
@@ -284,7 +284,7 @@ load_data(trainset, 1, trsize)
 --load_data(testset, 801, tesize)
 
 --print(visualize_data(target_x))
---print(visualize_data(all_classes(trainset.label, 10)))
+print(visualize_data(all_classes(trainset.label, 10)))
 
 
 

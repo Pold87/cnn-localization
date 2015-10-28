@@ -87,6 +87,13 @@ elseif opt.optimization == 'ASGD' then
    }
    optimMethod = optim.asgd
 
+
+elseif opt.optimization == 'ADADELTA' then
+   optimState = {
+      t0 = trsize * opt.t0
+   }
+   optimMethod = optim.adadelta
+
 else
    error('unknown optimization method')
 end
@@ -123,7 +130,7 @@ function train()
          local target = trainset.label[shuffle[i]]
 
          if opt.type == 'double' then input = input:double()
-         elseif opt.type == 'cuda' then input = input:cuda() end
+         elseif opt.type == 'cuda' then input = input:cl() end
          table.insert(inputs, input)
          table.insert(targets, target)
       end
@@ -155,10 +162,8 @@ function train()
 
                           -- update confusion
 
-                          print(output)
-
-                          print("to_classes(output, 10), ", to_classes(output, 10))
-                          print("to_classes(targets[i][1], 10) ", to_classes(targets[i][1], 10), "\n")
+                          --print("to_classes(output, 10), ", to_classes(output, 10))
+                          --print("to_classes(targets[i][1], 10) ", to_classes(targets[i][1], 10), "\n")
 
                           confusion:add(to_classes(output, 10), 
                                         to_classes(targets[i][1], 10))

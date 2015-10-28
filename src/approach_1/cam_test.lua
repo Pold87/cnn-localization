@@ -5,7 +5,7 @@ require 'nn'
 require 'csvigo'
 
 -- Settings
-dev = 1
+dev = 0
 width = 320
 height = 240
 fps = 30
@@ -21,8 +21,7 @@ max_iterations = 50
 ----------------------------------------------------------------------
 -- training/test size
 
-trsize = 100 -- training images
-tesize = 100 -- test images
+trsize = 1000 -- training images
 
 img_width = 224 / 2
 img_height = 224 / 2
@@ -43,13 +42,6 @@ trainset = {
    data = torch.Tensor(trsize, 3, img_width, img_height),
    label = torch.FloatTensor(trsize, 1, total_range),
    size = function() return trsize end
-}
-
--- Start by predicting the x coordinate
-testset = {
-   data = torch.Tensor(tesize, 3, img_width, img_height),
-   label = torch.FloatTensor(tesize, 1, total_range),
-   size = function() return tesize end
 }
 
 
@@ -114,7 +106,7 @@ cam = image.Camera{idx=dev,width=width,height=height,fps=fps}  -- create the cam
 frame = cam:forward()
 
 -- Resize image
-frame = image.scale(frame, 112, 112)
+frame = image.scale(frame, 224, 224)
 
 -- Display frame
 win = image.display{win=win,image=frame}
@@ -125,7 +117,7 @@ while true do
 
    frame = cam:forward():float()  -- return the next frame available
 
-   frame = image.scale(frame, 112, 112)
+   frame = image.scale(frame, 224, 224)
 
    frame = frame:float()
 

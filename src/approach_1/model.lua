@@ -135,17 +135,27 @@ elseif opt.model == 'volker' then
 
    model = nn.Sequential()
    model:add(nn.SpatialConvolution(3, 12, 5, 5))
+   model:add(nn.ReLU())
    model:add(nn.SpatialMaxPooling(2, 2, 2, 2)) 
+
    model:add(nn.SpatialConvolution(12, 16, 5, 5))
+   model:add(nn.ReLU())
    model:add(nn.SpatialMaxPooling(2,2,2,2))
-   model:add(nn.View(16 * 25 * 25))
-   model:add(nn.Linear(16 * 25 * 25, opt.dof * total_range))
+
+--   model:add(nn.View(16 * 25 * 25))
+   model:add(nn.View(16 * 53 * 53))
+
+   model:add(nn.Dropout(0.3))
+
+--   model:add(nn.Linear(16 * 25 * 25, opt.dof * total_range))
+   model:add(nn.Linear(16 * 53 * 53, opt.dof * total_range))
 --   model:add(nn.Reshape(opt.dof, total_range))
 
 elseif opt.model == 'volkersimple' then
 
    model = nn.Sequential()
    model:add(nn.View(112 * 112 * 3))
+
    model:add(nn.Linear(112 * 112 * 3, opt.dof * total_range))
 
 else
