@@ -70,11 +70,12 @@ dofile 'data.lua'
 dofile 'model.lua'
 dofile 'loss.lua'
 dofile 'train.lua'
---dofile '5_test.lua'
+dofile 'test.lua'
 
 ----------------------------------------------------------------------
 print '==> training!'
 
 while true do
    train()
+   test()
 end

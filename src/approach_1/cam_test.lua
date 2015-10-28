@@ -4,8 +4,21 @@ require 'torch'
 require 'nn'
 require 'csvigo'
 
+
+
+
+cmd = torch.CmdLine()
+cmd:text()
+cmd:text('Deep Drone - Cam Visualization')
+cmd:text()
+cmd:text('Options:')
+-- global:
+cmd:option('-dev', 0, 'Device number of the camera; on a laptop, 0 is usually the in-built cam, 1 the first external one, etc. ')
+cmd:text()
+opt = cmd:parse(arg or {})
+
 -- Settings
-dev = 0
+dev = opt.dev
 width = 320
 height = 240
 fps = 30
@@ -21,7 +34,7 @@ max_iterations = 50
 ----------------------------------------------------------------------
 -- training/test size
 
-trsize = 1000 -- training images
+trsize = 100 -- training images
 
 img_width = 224 / 2
 img_height = 224 / 2

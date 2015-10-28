@@ -28,25 +28,26 @@ function test()
 
    -- test over test data
    print('==> testing on test set:')
-   for t = 1,testData:size() do
+   for t = 1, testset:size() do
       -- disp progress
-      xlua.progress(t, testData:size())
+      xlua.progress(t, testset:size())
 
       -- get new sample
-      local input = testData.data[t]
+      local input = testset.data[t]
       if opt.type == 'double' then input = input:double()
       elseif opt.type == 'cuda' then input = input:cuda() end
-      local target = testData.labels[t]
+      local target = testset.label[t]
 
       -- test sample
       local pred = model:forward(input)
-      confusion:add(pred, target)
+      confusion:add(to_classes(pred, 10), 
+                    to_classes(target[1], 10))
    end
 
    -- timing
    time = sys.clock() - time
-   time = time / testData:size()
-   print("\n==> time to test 1 sample = " .. (time*1000) .. 'ms')
+   time = time / testset:size()
+   print("\n==> time to test 1 sample = " .. (time * 1000) .. 'ms')
 
    -- print confusion matrix
    print(confusion)

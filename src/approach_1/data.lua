@@ -40,7 +40,7 @@ if opt.size == 'full' then
    tesize = 100 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
-   trsize = 30
+   trsize = 180
    tesize = 10
 end
 
@@ -281,11 +281,10 @@ function load_data(dataset, start_pic_num, pics)
 end
 
 load_data(trainset, 1, trsize)
---load_data(testset, 801, tesize)
+load_data(testset, trsize + 1, tesize)
 
 --print(visualize_data(target_x))
 print(visualize_data(all_classes(trainset.label, 10)))
-
 
 
 function trainset:size() 
