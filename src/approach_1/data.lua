@@ -24,8 +24,16 @@ end
 
 
 -- Settings
-src = image.load("../../data/dice.jpg")
-img_folder = "../../data/genimgs/"
+--src = image.load("../../data/dice.jpg")
+--img_folder = "../../data/genimgs/"
+
+base_dir = "/home/pold/Documents/draug/"
+
+src = image.load(base_dir .. "img/popart_q.jpg")
+img_folder = base_dir .. "genimgs/"
+csv_file = csvigo.load(base_dir .. "targets.csv")
+
+
 use_opencl = false
 max_iterations = 50
 
@@ -36,12 +44,12 @@ max_iterations = 50
 
 if opt.size == 'full' then
    print '==> using regular, full training data'
-   trsize = 1000 -- training images
-   tesize = 100 -- test images
+   trsize = 510 -- training images
+   tesize = 210 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
-   trsize = 180
-   tesize = 10
+   trsize = 40
+   tesize = 40
 end
 
 img_width = 224
@@ -51,8 +59,7 @@ x_range = img_width * 2
 y_range = img_height * 2
 total_range = 350
 
--- Read CSV and convert to tensor
-csv_file = csvigo.load("../../data/targets.csv")
+-- Convert csv columns to tensors
 target_x = torch.Tensor(csv_file.x)
 target_y = torch.Tensor(csv_file.y)
 target_z = torch.Tensor(csv_file.z)
@@ -73,11 +80,10 @@ testset = {
 }
 
 
+
 -- Take a 1D-tensor (e.g. with size 300), and split it into classes
 -- For example, 1-30: class 1; 31 - 60: class 2; etc.
 function to_classes(predictions, classes) 
-
---   print(predictions)
 
    len = predictions:size()
    max, pos = predictions:max(1)
@@ -215,7 +221,7 @@ function makeTargets1DNewImage(y, stdv)
    
    Y = image.gaussian1D({size=total_range,
 			 mean=mean_pos,
-			 sigma=.015,
+			 sigma=.0035,
 			 normalize=true})
    Y:apply(set_small_nums_to_zero)
 
@@ -283,8 +289,10 @@ end
 load_data(trainset, 1, trsize)
 load_data(testset, trsize + 1, tesize)
 
+print(trainset.label[3])
+
 --print(visualize_data(target_x))
-print(visualize_data(all_classes(trainset.label, 10)))
+--print(visualize_data(all_classes(trainset.label, 10)))
 
 
 function trainset:size() 

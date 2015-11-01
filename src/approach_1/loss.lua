@@ -11,7 +11,7 @@
 require 'torch'   -- torch
 require 'nn'      -- provides all sorts of loss functions
 require 'nnx'      -- provides all sorts of loss functions
-require 'dp'      -- provides all sorts of loss functions
+--require 'dp'      -- provides all sorts of loss functions
 
 ----------------------------------------------------------------------
 -- parse command line arguments
@@ -114,9 +114,12 @@ elseif opt.loss == 'multi' then
    end
 
 elseif opt.loss == 'simple' then
-   model:add(nn.LogSoftMax())
+   
    criterion = nn.DistKLDivCriterion()
---   criterion = nn.SmoothL1Criterion()
+
+   if opt.type == 'cuda' then
+      criterion = criterion:cl()
+   end
 
 else
 

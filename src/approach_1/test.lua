@@ -23,25 +23,47 @@ function test()
       parameters:copy(average)
    end
 
+   local batchIdx = 0
+
    -- set model to evaluate mode (for modules that differ in training and testing, like Dropout)
    model:evaluate()
 
    -- test over test data
    print('==> testing on test set:')
    for t = 1, testset:size() do
+
       -- disp progress
       xlua.progress(t, testset:size())
 
-      -- get new sample
-      local input = testset.data[t]
-      if opt.type == 'double' then input = input:double()
-      elseif opt.type == 'cuda' then input = input:cuda() end
-      local target = testset.label[t]
 
-      -- test sample
-      local pred = model:forward(input)
-      confusion:add(to_classes(pred, 10), 
-                    to_classes(target[1], 10))
+      if opt.batchForward then
+
+         batchIdx = batchIdx + 1
+         local batchData = trainset.data:narrow(1, t, 1)
+         local batchLabels = trainset.label:narrow(1, t, 1)
+         
+         -- test sample
+         local pred = model:forward(batchData)
+         
+         confusion:add(to_classes(pred[1], 10), 
+                       to_classes(trainset.label[t][1], 10))
+
+
+      else
+
+         -- get new sample
+         local input = testset.data[t]
+         if opt.type == 'double' then input = input:double()
+         elseif opt.type == 'cuda' then input = input:cuda() end
+         local target = testset.label[t]
+         
+         -- test sample
+         local pred = model:forward(input)
+         confusion:add(to_classes(pred[1], 10), 
+                       to_classes(target[1], 10))
+         
+      end
+
    end
 
    -- timing

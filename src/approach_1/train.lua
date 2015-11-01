@@ -18,7 +18,7 @@ if not opt then
    cmd:option('-plot', false, 'live plot')
    cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
    cmd:option('-learningRate', 1e-3, 'learning rate at t=0')
-   cmd:option('-batchSize', 1, 'mini-batch size (1 = pure stochastic)')
+   cmd:option('-batchSize', 5, 'mini-batch size (1 = pure stochastic)')
    cmd:option('-weightDecay', 0, 'weight decay (SGD only)')
    cmd:option('-momentum', 0, 'momentum (SGD only)')
    cmd:option('-t0', 1, 'start averaging at t0 (ASGD only), in nb of epochs')
@@ -29,6 +29,10 @@ end
 
 -- CUDA?
 if opt.type == 'cuda' then
+
+   trainset.data = trainset.data:cl()
+   trainset.label = trainset.label:cl()
+
    model:cl()
    criterion:cl()
 end
@@ -94,6 +98,12 @@ elseif opt.optimization == 'ADADELTA' then
    }
    optimMethod = optim.adadelta
 
+elseif opt.optimization == 'ADAGRAD' then
+   optimState = {
+      t0 = trsize * opt.t0
+   }
+   optimMethod = optim.adagrad
+
 else
    error('unknown optimization method')
 end
@@ -114,25 +124,52 @@ function train()
    -- shuffle at each epoch
    shuffle = torch.randperm(trsize)
 
+   local batchIdx = 0
+
    -- do one epoch
    print('==> doing epoch on training data:')
    print("==> online epoch # " .. epoch .. ' [batchSize = ' .. opt.batchSize .. ']')
    for t = 1,trainset:size(),opt.batchSize do
+
+      batchIdx = 0
+      --local batchData = trainset.data:narrow(1, t, opt.batchSize)
+      --local batchLabels = trainset.label:narrow(1, t, opt.batchSize)
+
       -- disp progress
       xlua.progress(t, trainset:size())
 
       -- create mini batch
       local inputs = {}
       local targets = {}
-      for i = t,math.min(t+opt.batchSize-1,trainset:size()) do
+
+      local batchData = torch.Tensor(opt.batchSize, 3, img_width, img_height)
+      local batchLabels = torch.Tensor(opt.batchSize, opt.dof, total_range)
+
+      if opt.type == 'cuda' then
+         batchData = batchData:cl()
+         batchLabels = batchLabels:cl()
+      end
+
+      for i = t, math.min(t+opt.batchSize-1,trainset:size()) do
          -- load new sample
+
+         batchIdx = batchIdx + 1
+
          local input = trainset.data[shuffle[i]]
          local target = trainset.label[shuffle[i]]
 
-         if opt.type == 'double' then input = input:double()
-         elseif opt.type == 'cuda' then input = input:cl() end
+         if opt.type == 'double' then
+            input = input:double()
+         elseif opt.type == 'cuda' then 
+            input = input:cl() 
+            target = target:cl() 
+         end
          table.insert(inputs, input)
          table.insert(targets, target)
+
+         batchData[batchIdx] = input
+         batchLabels[batchIdx] = target
+
       end
 
       -- create closure to evaluate f(X) and df/dX
@@ -148,8 +185,27 @@ function train()
                        -- f is the average of all criterions
                        local f = 0
 
+                       if opt.batchForward then
+
+                          local output = model:forward(batchData)
+
+                          local err = criterion:forward(output, batchLabels)
+                          f = f + err
+
+                          -- estimate df/dW
+                          local df_do = criterion:backward(output, batchLabels)
+                          model:backward(batchData, df_do)
+
+                          -- update confusion
+
+                          confusion:batchAdd(all_classes(model.output, 10), 
+                                             all_classes(batchLabels, 10))
+
+                       else
+
                        -- evaluate function for complete mini batch
-                       for i = 1,#inputs do
+                        for i = 1, #inputs do
+
                           -- estimate f
                           local output = model:forward(inputs[i])
 
@@ -161,12 +217,11 @@ function train()
                           model:backward(inputs[i], df_do)
 
                           -- update confusion
-
-                          --print("to_classes(output, 10), ", to_classes(output, 10))
-                          --print("to_classes(targets[i][1], 10) ", to_classes(targets[i][1], 10), "\n")
-
-                          confusion:add(to_classes(output, 10), 
+                          confusion:add(to_classes(output[1], 10), 
                                         to_classes(targets[i][1], 10))
+                        end
+
+
                        end
 
                        -- normalize gradients and f(X)
@@ -174,7 +229,7 @@ function train()
                        f = f/#inputs
 
                        -- return f and df/dX
-                       return f,gradParameters
+                       return f, gradParameters
                     end
 
       -- optimize on current mini-batch

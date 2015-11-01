@@ -131,25 +131,132 @@ elseif opt.model == 'convnet' then
       model:add(nn.MultiSoftMax())
    end
 
-elseif opt.model == 'volker' then
+elseif opt.model == 'l2model' then
 
    model = nn.Sequential()
-   model:add(nn.SpatialConvolution(3, 12, 5, 5))
-   model:add(nn.ReLU())
-   model:add(nn.SpatialMaxPooling(2, 2, 2, 2)) 
 
-   model:add(nn.SpatialConvolution(12, 16, 5, 5))
-   model:add(nn.ReLU())
-   model:add(nn.SpatialMaxPooling(2,2,2,2))
+   model:add(nn.SpatialConvolution(3, 12, 3, 3, 2, 2, 1, 1))
+   model:add(nn.SpatialLPPooling(12, 2 , poolsize, poolsize))
+   model:add(nn.ReLU(true))
+   model:add(nn.SpatialDropout(0.5))
 
---   model:add(nn.View(16 * 25 * 25))
+
+   model:add(nn.SpatialConvolution(12, 8, 4, 4))
+   model:add(nn.SpatialLPPooling(8, 2, poolsize, poolsize))
+   model:add(nn.ReLU(true))
+   model:add(nn.SpatialDropout(0.5))
+
+   model:add(nn.View(8 * 26 * 26))
+   model:add(nn.Linear(8 * 26 * 26, opt.dof * total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+elseif opt.model == 'convmodel' then
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 6, 5, 5))
+--   model:add(nn.ReLU(true))
+   model:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+   model:add(nn.SpatialDropout(0.5))
+
+
+   model:add(nn.SpatialConvolution(6, 16, 5, 5))
+--   model:add(nn.ReLU(true))
+   model:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+   model:add(nn.SpatialDropout(0.5))
+
+
    model:add(nn.View(16 * 53 * 53))
 
-   model:add(nn.Dropout(0.3))
-
---   model:add(nn.Linear(16 * 25 * 25, opt.dof * total_range))
    model:add(nn.Linear(16 * 53 * 53, opt.dof * total_range))
---   model:add(nn.Reshape(opt.dof, total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+elseif opt.model == 'allconv' then
+
+   -- It worked worked on train but not on test set 
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 12, 3, 3))
+   model:add(nn.SpatialConvolution(12, 16, 3, 3))
+   model:add(nn.SpatialConvolution(16, 18, 3, 3))
+   model:add(nn.SpatialConvolution(18, 20, 3, 3, 2, 2))
+   model:add(nn.SpatialDropout(0.1))
+   model:add(nn.SpatialConvolution(20, 16, 3, 3, 1, 1))
+   model:add(nn.SpatialConvolution(16, 12, 3, 3, 1, 1))
+   model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
+
+   model:add(nn.View(12 * 51 * 51))
+
+   model:add(nn.Linear(12 * 51 * 51, opt.dof * total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+
+elseif opt.model == 'allconvbn' then
+
+   -- THIS IS KILLER
+   -- BATCH NORM RULEZ !1!11!!
+
+-- Worked perfectly with qlua
+--  doall.lua -batchSize 7 -model allconvbn -optimization ADAGRAD 
+
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 12, 3, 3))
+   model:add(nn.SpatialConvolution(12, 16, 3, 3))
+   model:add(nn.SpatialConvolution(16, 18, 3, 3))
+   model:add(nn.SpatialConvolution(18, 20, 3, 3, 2, 2))
+   model:add(nn.SpatialBatchNormalization(20, nil,nil, false))
+   model:add(nn.SpatialConvolution(20, 16, 3, 3, 1, 1))
+   model:add(nn.SpatialConvolution(16, 12, 3, 3, 1, 1))
+   model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
+
+   model:add(nn.View(12 * 51 * 51))
+
+   model:add(nn.Linear(12 * 51 * 51, opt.dof * total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+
+
+elseif opt.model == 'allconvcuda' then
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 12, 3, 3))
+   model:add(nn.SpatialConvolution(12, 12, 3, 3))
+   model:add(nn.SpatialConvolution(12, 12, 3, 3))
+   model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
+   model:add(nn.SpatialConvolution(12, 16, 3, 3, 1, 1))
+
+   model:add(nn.View(16 * 53 * 53))
+
+   model:add(nn.Linear(16 * 53 * 53, opt.dof * total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+   model:cl()
+
+
+elseif opt.model == 'bnmodel' then
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 12, 3, 3, 2, 2, 1, 1))
+   model:add(nn.SpatialBatchNormalization(12, nil,nil, false))
+   model:add(nn.ReLU(true))
+   model:add(nn.SpatialDropout(0.1))
+
+
+   model:add(nn.SpatialConvolution(12, 8, 4, 4))
+   model:add(nn.SpatialBatchNormalization(8, nil, nil, false))
+   model:add(nn.ReLU(true))
+   model:add(nn.SpatialDropout(0.1))
+
+
+   model:add(nn.View(8 * 109 * 109))
+   model:add(nn.Linear(8 * 109 * 109, opt.dof * total_range))
+   model:add(nn.Reshape(opt.dof, total_range))
+
 
 elseif opt.model == 'volkersimple' then
 
