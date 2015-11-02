@@ -3,7 +3,7 @@ require 'image'
 require 'torch'
 require 'nn'
 require 'csvigo'
-
+require 'math'
 
 
 
@@ -18,27 +18,6 @@ cmd:option('-batchNorm', true, 'Use batch normalization')
 cmd:text()
 opt = cmd:parse(arg or {})
 
--- Settings
-dev = opt.dev
-width = 320
-height = 240
-fps = 30
-
-base_dir = "/home/pold/Documents/draug/"
-
-src = image.load("../../data/dice.jpg")
-img_folder = base_dir .. "genimgs/"
-csv_file = csvigo.load(base_dir .. "targets.csv")
-
-
-use_opencl = false
-max_iterations = 50
-
--- Amount of synthetic views
-
-----------------------------------------------------------------------
--- training/test size
-
 trsize = 100 -- training images
 
 img_width = 224
@@ -48,11 +27,18 @@ x_range = img_width * 2
 y_range = img_height * 2
 total_range = 350
 
+
+base_dir = "/home/pold/Documents/draug/"
+
+-- Image folder
+img_folder = base_dir .. "genimgs/"
+
+
 -- Read CSV and convert to tensor
-csv_file = csvigo.load("../../data/targets.csv")
+csv_file = csvigo.load(base_dir .. "targets.csv")
 target_x = torch.Tensor(csv_file.x)
-target_y = torch.Tensor(csv_file.y)
-target_z = torch.Tensor(csv_file.z)
+
+model = torch.load("results/model.t7")
 
 
 -- Start by predicting the x coordinate
@@ -117,20 +103,10 @@ end
 
 
 
--- Initialize camera
-cam = image.Camera{idx=dev,width=width,height=height,fps=fps}  -- create the camera grabber
 
--- Grab frame
-frame = cam:forward()
-
--- Resize image
-frame = image.scale(frame, 224, 224)
-
--- Display frame
-win = image.display{win=win,image=frame}
-
-model = torch.load("results/model.t7")
-
+function sleep(n)
+  os.execute("sleep " .. tonumber(n))
+end
 
 
 -- Define the normalization neighborhood:
@@ -165,29 +141,41 @@ function preprocess(img)
 
 end
 
-while true do
 
-   frame = cam:forward():float()  -- return the next frame available
 
-   frame = preprocess(frame)
+-- Display frame
+win = image.display{win=win,image=image.load(img_folder .. 0 .. ".png")}
 
-      -- test sample
+-- Compare images
+
+for i = 1, 1000 do
+
+   img = image.load(img_folder .. (i - 1) .. ".png")
+
+   image.display{win=win, image=img}  -- display frame
+
+   img = preprocess(img)
+
+
+   print("Actual value is", target_x[i])
+
+   -- test sample
    if opt.batchNorm then
       local batchData = torch.Tensor(1, 3, img_width, img_height):float()
-      batchData[1] = frame:float()
+      batchData[1] = img:float()
 
        pred = model:forward(batchData)
    else
-       pred = model:forward(frame)
+       pred = model:forward(img)
    end
+
 
    max, pos = pred:max(2)
 
-   print(pos)
+   print("Iteration", i)
+   print("Predicted value is", pos[1][1])
 
-   image.display{win=win, image=frame}  -- display frame
-
+   print("Diff is", math.abs(pos[1][1] - target_x[i]))
+   print("")
 
 end
-
-cam:stop() -- release the camera

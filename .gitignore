@@ -9,3 +9,5 @@ tutorials/
 *.png
 scratch/
 *.ipynb
+*.log
+*.eps

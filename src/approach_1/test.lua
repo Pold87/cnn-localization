@@ -35,18 +35,17 @@ function test()
       -- disp progress
       xlua.progress(t, testset:size())
 
-
       if opt.batchForward then
 
          batchIdx = batchIdx + 1
-         local batchData = trainset.data:narrow(1, t, 1)
-         local batchLabels = trainset.label:narrow(1, t, 1)
+         local batchData = testset.data:narrow(1, t, 1)
+         local batchLabels = testset.label:narrow(1, t, 1)
          
          -- test sample
          local pred = model:forward(batchData)
          
          confusion:add(to_classes(pred[1], 10), 
-                       to_classes(trainset.label[t][1], 10))
+                       to_classes(testset.label[t][1], 10))
 
 
       else

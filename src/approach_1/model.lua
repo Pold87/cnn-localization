@@ -33,6 +33,40 @@ if not opt then
    opt = cmd:parse(arg or {})
 end
 
+
+
+
+
+
+local SpatialMaxout, parent = torch.class('nn.SpatialMaxout','nn.Module')
+
+function SpatialMaxout:__init()
+   parent.__init(self)
+   self.poolsize = 2
+end
+
+function SpatialMaxout:updateOutput(input)
+   assert(input:size(2) % self.poolsize == 0)
+   self.output:resize(input:size(1), input:size(2) / self.poolsize, 
+      input:size(3), input:size(4))
+
+   jzt.SpatialMaxout_costGrad(input, self.output, self.gradInput, 
+      self.gradInput, self.poolsize, 0)
+   return self.output
+end
+
+function SpatialMaxout:updateGradInput(input, gradOutput)
+   self.gradInput:resizeAs(input)
+   self.gradInput:zero()
+   
+   jzt.SpatialMaxout_costGrad(input, self.output, self.gradInput, 
+      gradOutput, self.poolsize, 1)
+   return self.gradInput
+end
+
+
+
+
 ----------------------------------------------------------------------
 print '==> define parameters'
 
@@ -121,14 +155,15 @@ elseif opt.model == 'convnet' then
       model:add(nn.SpatialLPPooling(nstates[2],2,poolsize,poolsize,poolsize,poolsize))
       model:add(nn.SpatialSubtractiveNormalization(nstates[2], normkernel))
 
-      -- stage 3 : standard 2-layer neural network
-      model:add(nn.Reshape(nstates[2] * filtsize * filtsize * filtsize * filtsize))
+      model:add(nn.Reshape(112 * 53 * 53))
 --      model:add(nn.Reshape())
-      model:add(nn.Linear(nstates[2] * filtsize * filtsize * filtsize * filtsize, nstates[3]))
+      model:add(nn.Linear(112 * 53 * 42, nstates[3]))
       model:add(nn.Tanh())
-      model:add(nn.Linear(nstates[3], 2 * noutputs))
-      model:add(nn.Reshape(2, noutputs))
-      model:add(nn.MultiSoftMax())
+      model:add(nn.Linear(nstates[3], opt.dof * total_range))
+
+      model:add(nn.Reshape(opt.dof, total_range))
+
+
    end
 
 elseif opt.model == 'l2model' then
@@ -181,7 +216,7 @@ elseif opt.model == 'allconv' then
    model:add(nn.SpatialConvolution(12, 16, 3, 3))
    model:add(nn.SpatialConvolution(16, 18, 3, 3))
    model:add(nn.SpatialConvolution(18, 20, 3, 3, 2, 2))
-   model:add(nn.SpatialDropout(0.1))
+   model:add(nn.SpatialDropout(0.5))
    model:add(nn.SpatialConvolution(20, 16, 3, 3, 1, 1))
    model:add(nn.SpatialConvolution(16, 12, 3, 3, 1, 1))
    model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
@@ -203,18 +238,83 @@ elseif opt.model == 'allconvbn' then
 
    model = nn.Sequential()
 
-   model:add(nn.SpatialConvolution(3, 12, 3, 3))
-   model:add(nn.SpatialConvolution(12, 16, 3, 3))
-   model:add(nn.SpatialConvolution(16, 18, 3, 3))
-   model:add(nn.SpatialConvolution(18, 20, 3, 3, 2, 2))
-   model:add(nn.SpatialBatchNormalization(20, nil,nil, false))
-   model:add(nn.SpatialConvolution(20, 16, 3, 3, 1, 1))
-   model:add(nn.SpatialConvolution(16, 12, 3, 3, 1, 1))
-   model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
+   model:add(nn.SpatialConvolution(3, 8, 3, 3))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.2))
 
-   model:add(nn.View(12 * 51 * 51))
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.1))
 
-   model:add(nn.Linear(12 * 51 * 51, opt.dof * total_range))
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.2))
+
+
+   model:add(nn.SpatialConvolution(8, 8, 3, 3, 2, 2, 1, 1))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.1))
+
+
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.1))
+
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.1))
+
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
+
+
+   model:add(nn.SpatialConvolution(8, 8, 3, 3, 2, 2, 1, 1))
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.1))
+--   model:add(nn.SpatialDropout(0.5))
+--   model:add(nn.SpatialBatchNormalization(20, nil,nil, false))
+
+--   model:add(nn.ReLU())
+--   model:add(nn.SpatialDropout(0.2))
+
+-- model:add(nn.SpatialConvolution(14, 14, 3, 3, 2, 2))
+--   model:add(nn.ReLU())
+
+
+   model:add(nn.View(8 * 52 * 52))
+
+
+   model:add(nn.Linear(8 * 52 * 52, opt.dof * total_range))
+
+--   model:add(nn.Dropout(0.5))
+   model:add(nn.Reshape(opt.dof, total_range))
+
+
+elseif opt.model == 'allconvbn2' then
+
+   -- THIS IS KILLER
+   -- BATCH NORM RULEZ !1!11!!
+
+-- Worked perfectly with qlua
+--  doall.lua -batchSize 7 -model allconvbn -optimization ADAGRAD 
+
+
+   model = nn.Sequential()
+
+   model:add(nn.SpatialConvolution(3, 24, 3, 3))
+--   model:add(nn.ReLU())
+   model:add(nn.SpatialDropout(0.3))
+   model:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+
+   model:add(nn.SpatialConvolution(24, 12, 3, 3))
+--   model:add(nn.ReLU())
+   model:add(nn.SpatialDropout(0.3))
+   model:add(nn.SpatialMaxPooling(2, 2, 2, 2))
+
+
+   model:add(nn.View(12 * 54 * 54))
+
+   model:add(nn.Linear(12 * 54 * 54, opt.dof * total_range))
    model:add(nn.Reshape(opt.dof, total_range))
 
 

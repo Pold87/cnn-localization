@@ -23,6 +23,7 @@ if not opt then
    cmd:option('-momentum', 0, 'momentum (SGD only)')
    cmd:option('-t0', 1, 'start averaging at t0 (ASGD only), in nb of epochs')
    cmd:option('-maxIter', 2, 'maximum nb of iterations for CG and LBFGS')
+   cmd:option('-saveModel', false, 'Save model after each iteration')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
@@ -287,10 +288,14 @@ function train()
 
 
    -- save/log current model
-   local filename = paths.concat(opt.save, 'model.t7')
-   os.execute('mkdir -p ' .. sys.dirname(filename))
-   print('==> saving model to '..filename)
-   torch.save(filename, model)
+
+   if opt.saveModel then
+
+      local filename = paths.concat(opt.save, 'model.t7')
+      os.execute('mkdir -p ' .. sys.dirname(filename))
+      print('==> saving model to '..filename)
+      torch.save(filename, model)
+   end
 
    -- next epoch
    confusion:zero()
