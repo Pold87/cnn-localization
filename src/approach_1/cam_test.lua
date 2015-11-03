@@ -5,8 +5,6 @@ require 'nn'
 require 'csvigo'
 
 
-
-
 cmd = torch.CmdLine()
 cmd:text()
 cmd:text('Deep Drone - Cam Visualization')
@@ -24,7 +22,7 @@ width = 320
 height = 240
 fps = 30
 
-base_dir = "/home/pold/Documents/draug/"
+base_dir = "/home/pold87/Documents/Internship/draug/"
 
 src = image.load("../../data/dice.jpg")
 img_folder = base_dir .. "genimgs/"
@@ -181,7 +179,7 @@ while true do
        pred = model:forward(frame)
    end
 
-   max, pos = pred:max(2)
+   max, pos = pred:max(1)
 
    print(pos)
 

@@ -18,6 +18,7 @@ if not opt then
    cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
    cmd:option('-visualize', true, 'visualize input data and weights during training')
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
+cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
@@ -27,7 +28,7 @@ end
 --src = image.load("../../data/dice.jpg")
 --img_folder = "../../data/genimgs/"
 
-base_dir = "/home/pold/Documents/draug/"
+base_dir = opt.baseDir
 
 src = image.load(base_dir .. "img/popart_q.jpg")
 img_folder = base_dir .. "genimgs/"
@@ -45,8 +46,8 @@ max_iterations = 50
 if opt.size == 'full' then
    print '==> using regular, full training data'
    -- 510 worked perfectly
-   trsize = 450 -- training images
-   tesize = 110 -- test images
+   trsize = 2500 -- training images
+   tesize = 300 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40

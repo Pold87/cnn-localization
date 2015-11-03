@@ -118,7 +118,7 @@ elseif opt.loss == 'simple' then
    criterion = nn.DistKLDivCriterion()
 
    if opt.type == 'cuda' then
-      criterion = criterion:cl()
+      criterion = criterion:cuda()
    end
 
 else

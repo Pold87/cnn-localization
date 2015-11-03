@@ -37,7 +37,7 @@ cmd:option('-model', 'bnmodel', 'type of model to construct: linear | mlp | conv
 cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | margin | simple')
 -- training:
 cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
-cmd:option('-plot', true, 'live plot')
+cmd:option('-plot', false, 'live plot')
 cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
 cmd:option('-learningRate', 1e-3, 'learning rate at t=0')
 cmd:option('-batchSize', 30, 'mini-batch size (1 = pure stochastic)')
@@ -50,6 +50,7 @@ cmd:option('-type', 'float', 'type: double | float | cuda')
 cmd:option('-visualize', false, 'visualize weights of the network (true | false)')
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
+cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
 cmd:text()
 opt = cmd:parse(arg or {})
 
@@ -59,7 +60,7 @@ if opt.type == 'float' then
    torch.setdefaulttensortype('torch.FloatTensor')
 elseif opt.type == 'cuda' then
    print('==> switching to CUDA')
-   require 'clnn'
+   require 'cunn'
    torch.setdefaulttensortype('torch.FloatTensor')
 end
 torch.setnumthreads(opt.threads)
