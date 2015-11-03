@@ -146,8 +146,8 @@ function train()
       local batchLabels = torch.Tensor(opt.batchSize, opt.dof, total_range)
 
       if opt.type == 'cuda' then
-         batchData = batchData:cl()
-         batchLabels = batchLabels:cl()
+         batchData = batchData:cuda()
+         batchLabels = batchLabels:cuda()
       end
 
       for i = t, math.min(t+opt.batchSize-1,trainset:size()) do
@@ -161,8 +161,8 @@ function train()
          if opt.type == 'double' then
             input = input:double()
          elseif opt.type == 'cuda' then 
-            input = input:cl() 
-            target = target:cl() 
+            input = input:cuda() 
+            target = target:cuda() 
          end
          table.insert(inputs, input)
          table.insert(targets, target)

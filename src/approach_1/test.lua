@@ -40,6 +40,12 @@ function test()
          batchIdx = batchIdx + 1
          local batchData = testset.data:narrow(1, t, 1)
          local batchLabels = testset.label:narrow(1, t, 1)
+    
+      if opt.type == 'cuda' then
+         batchData = batchData:cuda()
+         batchLabels = batchLabels:cuda()
+      end
+
          
          -- test sample
          local pred = model:forward(batchData)

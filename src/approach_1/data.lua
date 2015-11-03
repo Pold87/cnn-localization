@@ -46,8 +46,8 @@ max_iterations = 50
 if opt.size == 'full' then
    print '==> using regular, full training data'
    -- 510 worked perfectly
-   trsize = 450 -- training images
-   tesize = 110 -- test images
+   trsize = 2500 -- training images
+   tesize = 300 -- test images
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40
