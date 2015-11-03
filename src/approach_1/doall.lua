@@ -50,6 +50,7 @@ cmd:option('-type', 'float', 'type: double | float | cuda')
 cmd:option('-visualize', false, 'visualize weights of the network (true | false)')
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
+cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
 cmd:text()
 opt = cmd:parse(arg or {})
 
