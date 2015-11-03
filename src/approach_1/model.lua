@@ -216,7 +216,7 @@ elseif opt.model == 'allconv' then
    model:add(nn.SpatialConvolution(12, 16, 3, 3))
    model:add(nn.SpatialConvolution(16, 18, 3, 3))
    model:add(nn.SpatialConvolution(18, 20, 3, 3, 2, 2))
-   model:add(nn.SpatialDropout(0.5))
+   model:add(nn.SpatialBatchNormalization(20, nil,nil, false))
    model:add(nn.SpatialConvolution(20, 16, 3, 3, 1, 1))
    model:add(nn.SpatialConvolution(16, 12, 3, 3, 1, 1))
    model:add(nn.SpatialConvolution(12, 12, 3, 3, 2, 2))
