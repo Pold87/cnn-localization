@@ -60,7 +60,7 @@ if opt.type == 'float' then
    torch.setdefaulttensortype('torch.FloatTensor')
 elseif opt.type == 'cuda' then
    print('==> switching to CUDA')
-   require 'clnn'
+   require 'cunn'
    torch.setdefaulttensortype('torch.FloatTensor')
 end
 torch.setnumthreads(opt.threads)

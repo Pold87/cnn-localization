@@ -1,7 +1,6 @@
 require 'torch'   -- torch
 require 'xlua'    -- xlua provides useful tools, like progress bars
 require 'optim'   -- an optimization package, for online and batch methods
-require 'clnn'
 require 'math'
 
 
@@ -31,11 +30,11 @@ end
 -- CUDA?
 if opt.type == 'cuda' then
 
-   trainset.data = trainset.data:cl()
-   trainset.label = trainset.label:cl()
+   trainset.data = trainset.data:cuda()
+   trainset.label = trainset.label:cuda()
 
-   model:cl()
-   criterion:cl()
+   model:cuda()
+   criterion:cuda()
 end
 
 
