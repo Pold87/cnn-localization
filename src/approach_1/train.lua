@@ -197,11 +197,26 @@ function train()
                           model:backward(batchData, df_do)
 
                           -- update confusion
+			  
+			if opt.model == 'disable' then
 
-                          confusion:batchAdd(all_classes(model.output, 10), 
+--				 print("pred", to_classes(output[1], 10))
+--				 print("classes", to_classes(batchLabels[1][1], 10))
+
+
+                          confusion:add(to_classes(output[1], 10), 
+                                        to_classes(batchLabels[1][1], 10))
+		
+			else
+--			print("batchLabels", batchLabels)					
+--			print(all_classes(model.output, 10))
+
+                          confusion:batchAdd(all_classes_2d(model.output, 10), 
                                              all_classes(batchLabels, 10))
 
-                       else
+                       end
+
+		       else
 
                        -- evaluate function for complete mini batch
                         for i = 1, #inputs do

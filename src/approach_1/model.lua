@@ -36,8 +36,6 @@ end
 
 
 
-
-
 local SpatialMaxout, parent = torch.class('nn.SpatialMaxout','nn.Module')
 
 function SpatialMaxout:__init()
@@ -83,7 +81,7 @@ ninputs = nfeats * width * height
 nhiddens = ninputs / 2
 
 -- hidden units, filter sizes (for ConvNet only):
-nstates = {112,112,224}
+nstates = {112, 112, 350}
 filtsize = 5
 poolsize = 2
 normkernel = image.gaussian1D(7)
@@ -124,11 +122,13 @@ elseif opt.model == 'convnet' then
       model:add(nn.SpatialMaxPooling(poolsize,poolsize,poolsize,poolsize))
 
       -- stage 3 : standard 2-layer neural network
-      model:add(nn.View(nstates[2] * filtsize * filtsize))
+      model:add(nn.View(112 * 53 * 53))
       model:add(nn.Dropout(0.5))
-      model:add(nn.Linear(nstates[2] * filtsize * filtsize, nstates[3]))
+      model:add(nn.Linear(112 * 53 * 53, nstates[3]))
       model:add(nn.ReLU())
-      model:add(nn.Linear(nstates[3], 2 * noutputs))
+      model:add(nn.Linear(nstates[3], nstates[3]))
+      model:add(nn.Reshape(opt.dof, total_range))	
+
 
    else
       -- a typical convolutional network, with locally-normalized hidden
@@ -239,53 +239,29 @@ elseif opt.model == 'allconvbn' then
    model = nn.Sequential()
 
    model:add(nn.SpatialConvolution(3, 8, 3, 3))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.2))
 
    model:add(nn.SpatialConvolution(8, 8, 3, 3))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.1))
 
    model:add(nn.SpatialConvolution(8, 8, 3, 3))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.2))
-
-
+   model:add(nn.SpatialBatchNormalization(8, nil,nil, false))
+   model:add(nn.PReLU())
    model:add(nn.SpatialConvolution(8, 8, 3, 3, 2, 2, 1, 1))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.1))
-
+   model:add(nn.SpatialDropout(0.1))
 
    model:add(nn.SpatialConvolution(8, 8, 3, 3))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.1))
-
    model:add(nn.SpatialConvolution(8, 8, 3, 3))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.1))
-
+   model:add(nn.SpatialConvolution(8, 8, 3, 3))
    model:add(nn.SpatialConvolution(8, 8, 3, 3))
 
-
+   model:add(nn.SpatialBatchNormalization(8, nil,nil, false))
+   model:add(nn.PReLU())
    model:add(nn.SpatialConvolution(8, 8, 3, 3, 2, 2, 1, 1))
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.1))
---   model:add(nn.SpatialDropout(0.5))
---   model:add(nn.SpatialBatchNormalization(20, nil,nil, false))
+   model:add(nn.SpatialDropout(0.1))
 
---   model:add(nn.ReLU())
---   model:add(nn.SpatialDropout(0.2))
+   model:add(nn.View(8 * 51 * 51))
 
--- model:add(nn.SpatialConvolution(14, 14, 3, 3, 2, 2))
---   model:add(nn.ReLU())
-
-
-   model:add(nn.View(8 * 52 * 52))
-
-
-   model:add(nn.Linear(8 * 52 * 52, opt.dof * total_range))
-
---   model:add(nn.Dropout(0.5))
+   model:add(nn.Linear(8 * 51 * 51, opt.dof * total_range))
+   model:add(nn.Dropout(0.1))
    model:add(nn.Reshape(opt.dof, total_range))
 
 
@@ -364,6 +340,13 @@ elseif opt.model == 'volkersimple' then
    model:add(nn.View(112 * 112 * 3))
 
    model:add(nn.Linear(112 * 112 * 3, opt.dof * total_range))
+
+elseif opt.model == 'alexnet' then
+
+   print("Model", model)	
+   model = require('deepinception')
+   print("Model", model)
+--   model:add(nn.Reshape(opt.dof, total_range))
 
 else
 

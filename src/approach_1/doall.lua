@@ -39,18 +39,19 @@ cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | ma
 cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
 cmd:option('-plot', false, 'live plot')
 cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
-cmd:option('-learningRate', 1e-3, 'learning rate at t=0')
+cmd:option('-learningRate', 5e-2, 'learning rate at t=0')
 cmd:option('-batchSize', 30, 'mini-batch size (1 = pure stochastic)')
-cmd:option('-batchForward', false, 'Forward input in batches or in a loop')
+cmd:option('-batchForward', true, 'Forward input in batches or in a loop')
 cmd:option('-weightDecay', 0.0005, 'weight decay (SGD only)')
 cmd:option('-momentum', 0.9, 'momentum (SGD only)')
 cmd:option('-t0', 1, 'start averaging at t0 (ASGD only), in nb of epochs')
 cmd:option('-maxIter', 2, 'maximum nb of iterations for CG and LBFGS')
 cmd:option('-type', 'float', 'type: double | float | cuda')
 cmd:option('-visualize', false, 'visualize weights of the network (true | false)')
-cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
+cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; 3:x, y, z.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
-cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
+cmd:option('-baseDir', '/scratch/vstrobel/locfiles/draug/', 'Base dir for images and targets')
+cmd:option('-regression', true, 'Base directory for images and targets')
 cmd:text()
 opt = cmd:parse(arg or {})
 
@@ -78,7 +79,12 @@ dofile 'test.lua'
 ----------------------------------------------------------------------
 print '==> training!'
 
-while true do
-   train()
-   test()
+--while true do
+--   train()
+--   test()
+--end
+
+for i=1, 50 do
+    train()
+    test()
 end

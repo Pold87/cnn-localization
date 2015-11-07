@@ -93,7 +93,7 @@ function to_classes(predictions, classes)
 
    class = (math.floor((pos[1] - 1) / width)) + 1
 
-   return class
+   return math.max(class, 1)
    
 
 end
@@ -120,6 +120,20 @@ function all_classes(labels, num_classes)
   return tmp_classes
   
 end
+
+function all_classes_2d(labels, num_classes)
+  s = labels:size(1)
+  tmp_classes = torch.Tensor(s):fill(0)
+
+  for i=1, labels:size(1) do
+    class = to_classes(labels[i], 10)  
+    tmp_classes[i] = class
+  end
+
+  return tmp_classes
+  
+end
+
 
 function normalized_to_raw(pred, mean_target, stdv_target)
     

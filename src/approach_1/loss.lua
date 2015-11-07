@@ -115,7 +115,8 @@ elseif opt.loss == 'multi' then
 
 elseif opt.loss == 'simple' then
    
-   criterion = nn.DistKLDivCriterion()
+   --criterion = nn.DistKLDivCriterion()
+   criterion = nn.ModuleCriterion(nn.DistKLDivCriterion(), logModule, nn.Convert())
 
    if opt.type == 'cuda' then
       criterion = criterion:cuda()
