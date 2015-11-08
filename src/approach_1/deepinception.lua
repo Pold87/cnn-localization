@@ -14,8 +14,8 @@ cmd:option('-batchSize', 32, 'number of examples per batch')
 cmd:option('-dontPad', false, 'dont add math.floor(kernelSize/2) padding to the input of each convolution') 
 -- regularization (and dropout or batchNorm)
 cmd:option('-maxOutNorm', 1, 'max norm each layers output neuron weights')
-cmd:option('-batchNorm', false, 'use batch normalization. dropout is mostly redundant with this')
-cmd:option('-dropout', true, 'use dropout')
+cmd:option('-batchNorm', true, 'use batch normalization. dropout is mostly redundant with this')
+cmd:option('-dropout', false, 'use dropout')
 cmd:option('-dropoutProb', '{0.2,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}', 'dropout probabilities')
 -- data and preprocessing
 cmd:option('-standardize', false, 'apply Standardize preprocessing')
@@ -39,7 +39,7 @@ cmd:option('-incepKernelStride', '{}', 'The stride (height=width) of the convolu
 cmd:option('-incepPoolSize', '{}', 'The size (height=width) of the spatial max pooling used in the next-to-last column. Variables default to 3')
 cmd:option('-incepPoolStride', '{}', 'The stride (height=width) of the spatial max pooling. Variables default to 1')
 -- dense layers
-cmd:option('-hiddenSize', '{500, 500}', 'size of the dense hidden layers after the convolution')
+cmd:option('-hiddenSize', '{}', 'size of the dense hidden layers after the convolution')
 -- misc
 cmd:option('-cuda', true, 'use CUDA')
 cmd:option('-useDevice', 1, 'sets the device (GPU) to use')
@@ -49,7 +49,7 @@ cmd:option('-accUpdate', false, 'accumulate gradients inplace (much faster, but 
 cmd:option('-progress', false, 'print progress bar')
 cmd:option('-silent', false, 'dont print anything to stdout')
 cmd:option('-seed', 43, 'fixed input seed for repeatable experiments')
-cmd:option('-threads', 3, 'number of threads')
+cmd:option('-threads', 8, 'number of threads')
 -- data:
 cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
 -- model:
@@ -70,6 +70,7 @@ cmd:option('-visualize', false, 'visualize weights of the network (true | false)
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
 cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
+cmd:option('-regression', true, 'Base directory for images and targets')
 
 cmd:text()
 opt = cmd:parse(arg or {})
@@ -145,12 +146,10 @@ for i=1,#opt.convChannelSize do
    end
    inputSize = opt.convChannelSize[i]
    depth = depth + 1
-   print"You should probably FUCK UP"	
 end
 
 -- Inception layers
 for i=1,#opt.incepChannelSize do
-   print"You should probably FUCK DOWN"	
    if opt.dropout and (opt.dropoutProb[depth] or 0) > 0 then
       -- dropout can be useful for regularization
       cnn:add(nn.SpatialDropout(opt.dropoutProb[depth]))
@@ -171,8 +170,6 @@ for i=1,#opt.incepChannelSize do
    inputSize = cnn:outside(insize)[2]
    depth = depth + 1
 end
-
-   print"You should probably LOVEME"	
 
 -- get output size of convolutional layers
 outsize = cnn:outside(insize)
@@ -200,6 +197,11 @@ end
 if opt.dropout and (opt.dropoutProb[depth] or 0) > 0 then
    cnn:add(nn.Dropout(opt.dropoutProb[depth]))
 end
-cnn:add(nn.Linear(inputSize, 350))
+
+-- Convert the estimations to one prediction per coordinate
+if opt.regression then
+      cnn:add(nn.Linear(inputSize, opt.dof))
+end
+
 
 return cnn

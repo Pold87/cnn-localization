@@ -18,7 +18,10 @@ if not opt then
    cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
    cmd:option('-visualize', true, 'visualize input data and weights during training')
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
-cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
+   cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
+   cmd:option('-regression', true, 'Base directory for images and targets')
+   cmd:option('--standardize', false, 'apply Standardize preprocessing')
+   cmd:option('--zca', false, 'apply Zero-Component Analysis whitening')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
@@ -52,6 +55,10 @@ elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40
    tesize = 40
+elseif opt.size == 'xsmall' then
+   print '==> using reduced training data, for fast experiments'
+   trsize = 8
+   tesize = 8
 end
 
 img_width = 224
@@ -59,7 +66,12 @@ img_height = 224
 
 x_range = img_width * 2
 y_range = img_height * 2
-total_range = 350
+
+if opt.regression then 
+   total_range = 1
+else  
+   total_range = 350
+end
 
 -- Convert csv columns to tensors
 target_x = torch.Tensor(csv_file.x)
@@ -82,64 +94,21 @@ testset = {
 }
 
 
-
--- Take a 1D-tensor (e.g. with size 300), and split it into classes
--- For example, 1-30: class 1; 31 - 60: class 2; etc.
-function to_classes(predictions, classes) 
-
-   len = predictions:size()
-   max, pos = predictions:max(1)
-   width = len[1] / classes -- width of the bins
-
-   class = (math.floor((pos[1] - 1) / width)) + 1
-
-   return math.max(class, 1)
-   
-
-end
-
-
-function visualize_data(targets)
-
-   print(targets)
-   hist = torch.histc(targets, 10)
-   gnuplot.hist(targets, 10, 1, 10)
-   print("Histogram", hist)
-
-end
-
-function all_classes(labels, num_classes)
-  s = labels:size(1)
-  tmp_classes = torch.Tensor(s):fill(0)
-
-  for i=1, labels:size(1) do
-    class = to_classes(labels[i][1], 10)  
-    tmp_classes[i] = class
-  end
-
-  return tmp_classes
-  
-end
-
-function all_classes_2d(labels, num_classes)
-  s = labels:size(1)
-  tmp_classes = torch.Tensor(s):fill(0)
-
-  for i=1, labels:size(1) do
-    class = to_classes(labels[i], 10)  
-    tmp_classes[i] = class
-  end
-
-  return tmp_classes
-  
-end
-
-
 function normalized_to_raw(pred, mean_target, stdv_target)
     
     val = pred:clone()
     val = val:cmul(stdv_target)
     val = val:add(mean_target)
+    
+    return val 
+end
+
+
+function normalized_to_raw_num(pred, mean_target, stdv_target)
+    
+    val = pred
+    val = val * stdv_target
+    val = val + mean_target
     
     return val 
 end
@@ -153,6 +122,20 @@ function raw_to_normalized(pred, mean_target, stdv_target)
     
     return val 
 end
+
+
+
+
+
+function visualize_data(targets)
+
+   print(targets)
+   hist = torch.histc(targets, 10)
+   gnuplot.hist(targets, 10, 1, 10)
+   print("Histogram", hist)
+
+end
+
 
 
 function sleep(n)
@@ -254,6 +237,7 @@ function load_data(dataset, start_pic_num, pics)
       label = torch.Tensor(pics, opt.dof)
    end
 
+   -- TODO: think about if a while loop is better here
    i_prime = start_pic_num
 
    for i = 1, pics do
@@ -263,18 +247,18 @@ function load_data(dataset, start_pic_num, pics)
       img = image.scale(img, img_width, img_height)
    
       true_x = target_x[i_prime]
-      --true_x = true_x - 50
-      int_true_x = math.min(math.floor(true_x),  total_range)
-      
       true_y = target_y[i_prime]
-      true_y = true_y + 112
-      int_true_y = math.min(math.floor(true_y),  total_range)
-      
+
+      if not opt.regression then
+	 true_x = math.min(math.floor(true_x),  total_range)
+	 true_y = math.min(math.floor(true_y),  total_range)
+      end
+     
       dataset.data[i] = img
 
       -- Degrees of freedom
       if opt.dof == 1 then
-         label[i] = int_true_x
+         label[i] = true_x
       else
          label[i][1] = true_x
       end
@@ -284,25 +268,21 @@ function load_data(dataset, start_pic_num, pics)
 
       i_prime = i_prime + 1
 
-      if opt.dof == 1 then
-	 dataset.label[i] = makeTargets1DNewImage(int_true_x, .15)
+      if opt.regression then
+	 dataset.label[i] = true_x
+      else
+	 dataset.label[i] = makeTargets1DNewImage(true_x, .15)
 
-	 -- DEBUG ONLY
-	 -- dataset.label[i]:fill(0)
-	 -- dataset.label[i][1][1] = 1
-	 
       end
        
    end
-
---      if opt.dof ~= 1 then
---         dataset.label = makeTargets(label, 1)
---      end 
 
 end
 
 load_data(trainset, 1, trsize)
 load_data(testset, trsize + 1, tesize)
+
+
 
 --print(visualize_data(target_x))
 --print(visualize_data(all_classes(trainset.label, 10)))
@@ -335,6 +315,8 @@ print '==> preprocessing data'
 
 trainset.data = trainset.data:float() -- convert the data from a ByteTensor to a DoubleTensor.
 testset.data = testset.data:float() -- convert the data from a ByteTensor to a DoubleTensor.
+trainset.label = trainset.label:float() -- convert the data from a ByteTensor to a DoubleTensor.
+testset.label = testset.label:float() -- convert the data from a ByteTensor to a DoubleTensor.
 
 
 -- Convert all images to YUV
@@ -359,20 +341,35 @@ channels = {'y','u','v'}
 print '==> preprocessing data: normalize each feature (channel) globally'
 mean = {}
 std = {}
+
+mean_target = trainset.label:mean()
+std_target = trainset.label:std()
+
+
 for i, channel in ipairs(channels) do
    -- normalize each channel globally:
    mean[i] = trainset.data[{ {},i,{},{} }]:mean()
    std[i] = trainset.data[{ {},i,{},{} }]:std()
+
    trainset.data[{ {},i,{},{} }]:add(-mean[i])
    trainset.data[{ {},i,{},{} }]:div(std[i])
+
 end
+
+trainset.label:add(-mean_target)
+trainset.label:div(std_target)
+
 
 -- Normalize test data, using the training means/stds
 for i, channel in ipairs(channels) do
    -- normalize each channel globally:
    testset.data[{ {},i,{},{} }]:add(-mean[i])
    testset.data[{ {},i,{},{} }]:div(std[i])
+
 end
+
+testset.label:add(-mean_target)
+testset.label:div(std_target)
 
 -- Local normalization
 print '==> preprocessing data: normalize all three channels locally'
@@ -430,3 +427,60 @@ if opt.visualize then
       itorch.image(first256Samples_v)
    end
 end
+
+-- Take a 1D-tensor (e.g. with size 300), and split it into classes
+-- For example, 1-30: class 1; 31 - 60: class 2; etc.
+function to_classes(predictions, classes) 
+
+   if opt.regression then
+
+      width = 35
+      pos = predictions[1]
+      pos = normalized_to_raw_num(pos, mean_target, std_target)
+
+--      print("Pos is", pos)
+   else
+      len = predictions:size()
+      max, pos = predictions:max(1)
+      pos = pos[1]
+      width = len[1] / classes -- width of the bins
+   end
+
+   class = (math.floor((pos - 1) / width)) + 1
+
+   return math.min(math.max(class, 1), classes)
+   
+
+end
+
+function all_classes(labels, num_classes)
+  s = labels:size(1)
+  tmp_classes = torch.Tensor(s):fill(0)
+
+  for i=1, labels:size(1) do
+     if opt.regression then
+	class = to_classes(labels[i][1], 10)  
+     else
+	class = to_classes(labels[i][1], 10)  
+     end
+    tmp_classes[i] = class
+  end
+
+  return tmp_classes
+  
+end
+
+function all_classes_2d(labels, num_classes)
+  s = labels:size(1)
+  tmp_classes = torch.Tensor(s):fill(0)
+
+  for i=1, labels:size(1) do
+    class = to_classes(labels[i], 10)  
+    tmp_classes[i] = class
+  end
+
+  return tmp_classes
+  
+end
+
+

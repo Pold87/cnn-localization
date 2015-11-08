@@ -115,8 +115,12 @@ elseif opt.loss == 'multi' then
 
 elseif opt.loss == 'simple' then
    
-   --criterion = nn.DistKLDivCriterion()
-   criterion = nn.ModuleCriterion(nn.DistKLDivCriterion(), logModule, nn.Convert())
+   if opt.regression then
+      criterion = nn.MSECriterion()
+   else
+      --criterion = nn.DistKLDivCriterion()
+      criterion = nn.ModuleCriterion(nn.DistKLDivCriterion(), logModule, nn.Convert())
+   end
 
    if opt.type == 'cuda' then
       criterion = criterion:cuda()

@@ -211,6 +211,9 @@ function train()
 --			print("batchLabels", batchLabels)					
 --			print(all_classes(model.output, 10))
 
+--			   print("2d", all_classes_2d(model.output, 10))
+--			   print("all", all_classes(batchLabels, 10))
+
                           confusion:batchAdd(all_classes_2d(model.output, 10), 
                                              all_classes(batchLabels, 10))
 
