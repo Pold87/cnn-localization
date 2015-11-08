@@ -5,6 +5,7 @@ require 'math'
 require 'csvigo'
 require 'distributions'
 require 'gnuplot'
+require 'dp'
 
 
 -- parse command line arguments
@@ -16,30 +17,25 @@ if not opt then
    cmd:text()
    cmd:text('Options:')
    cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
-   cmd:option('-visualize', true, 'visualize input data and weights during training')
+   cmd:option('-visualize', false, 'visualize input data and weights during training')
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
    cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
    cmd:option('-regression', true, 'Base directory for images and targets')
-   cmd:option('--standardize', false, 'apply Standardize preprocessing')
-   cmd:option('--zca', false, 'apply Zero-Component Analysis whitening')
+   cmd:option('-standardize', false, 'apply Standardize preprocessing')
+   cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
+   cmd:option('-scaleImages', false, 'scale input images to 224 x 224')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
 
 
--- Settings
---src = image.load("../../data/dice.jpg")
---img_folder = "../../data/genimgs/"
+-- Settings --
 
-base_dir = opt.baseDir
+img_folder = opt.baseDir .. "genimgs/"
+csv_file = csvigo.load(opt.baseDir .. "targets.csv")
 
-src = image.load(base_dir .. "img/popart_q.jpg")
-img_folder = base_dir .. "genimgs/"
-csv_file = csvigo.load(base_dir .. "targets.csv")
-
-
-use_opencl = false
-max_iterations = 50
+img_width = 224
+img_height = 224
 
 -- Amount of synthetic views
 
@@ -51,21 +47,19 @@ if opt.size == 'full' then
    -- 510 worked perfectly
    trsize = 2500 -- training images
    tesize = 300 -- test images
+   totalSize = 5000
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40
    tesize = 40
+   totalSize = 50
 elseif opt.size == 'xsmall' then
    print '==> using reduced training data, for fast experiments'
    trsize = 8
    tesize = 8
+   totalSize = 15
 end
 
-img_width = 224
-img_height = 224
-
-x_range = img_width * 2
-y_range = img_height * 2
 
 if opt.regression then 
    total_range = 1
@@ -74,19 +68,17 @@ else
 end
 
 -- Convert csv columns to tensors
-target_x = torch.Tensor(csv_file.x)
-target_y = torch.Tensor(csv_file.y)
-target_z = torch.Tensor(csv_file.z)
+local target_x = torch.Tensor(csv_file.x)
+local target_y = torch.Tensor(csv_file.y)
+local target_z = torch.Tensor(csv_file.z)
 
 
--- Start by predicting the x coordinate
 trainset = {
    data = torch.Tensor(trsize, 3, img_width, img_height),
    label = torch.FloatTensor(trsize, opt.dof, total_range),
    size = function() return trsize end
 }
 
--- Start by predicting the x coordinate
 testset = {
    data = torch.Tensor(tesize, 3, img_width, img_height),
    label = torch.FloatTensor(tesize, opt.dof, total_range),
@@ -125,84 +117,12 @@ end
 
 
 
-
-
 function visualize_data(targets)
 
    print(targets)
    hist = torch.histc(targets, 10)
    gnuplot.hist(targets, 10, 1, 10)
    print("Histogram", hist)
-
-end
-
-
-
-function sleep(n)
-  os.execute("sleep " .. tonumber(n))
-end
-
-
-function makeTargets(y, stdv)
-   -- y : (batch_size, num_keypoints*2)
-   -- Y : (batch_size, num_keypoints*2, 98)
-   Y = torch.FloatTensor(y:size(1), y:size(2), total_range):zero()
-   pixels = torch.range(1,total_range):float()
-   local k = 0
-   for i=1,y:size(1) do
-      local keypoints = y[i]
-      local new_keypoints = Y[i]
-      for j=1,y:size(2) do
-         local kp = keypoints[j]
-         if kp ~= -1 then
-            local new_kp = new_keypoints[j]
-            new_kp:add(pixels, -kp)
-            new_kp:cmul(new_kp)
-            new_kp:div(2 * stdv * stdv)
-            new_kp:mul(-1)
-            new_kp:exp(new_kp)
-            new_kp:div(math.sqrt(2 * math.pi) * stdv)
-         else
-            k = k + 1
-         end
-      end
-   end
-   return Y
-end
-
-function makeTargets1D(y, stdv)
-   -- y : (batch_size, num_keypoints*2)
-   -- Y : (batch_size, num_keypoints*2, 98)
-   
-   Y = torch.FloatTensor(total_range):zero()
-   pixels = torch.range(1,total_range):float()
-   local k = 0
-   local new_keypoints = Y
-   for j=1, Y:size(1) do
-         local new_kp = new_keypoints[j]
-         new_kp = pixels - y
-         new_kp = new_kp * new_kp
-         new_kp = new_kp / (2 * stdv * stdv)
-         new_kp = - new_kp
-         new_kp = math.exp(new_kp)
-         new_kp = new_kp / (math.sqrt(2 * math.pi) * stdv)
-   end
-   return Y
-end
-
-
-function makeTargets1DNew(y, stdv)
-
-   Y = torch.FloatTensor(total_range):zero()
-
-   for i = 1, Y:size() do
-
-      local val = Y[i]
-      val = distributions.norm.pdf(i, y, stdv)
-   end
-
-   return Y
-   
 
 end
 
@@ -214,7 +134,7 @@ function set_small_nums_to_zero(x)
    return val
 end      
 
-function makeTargets1DNewImage(y, stdv)
+function makeTargets(y, stdv)
 
    mean_pos = y / total_range
    
@@ -228,259 +148,54 @@ function makeTargets1DNewImage(y, stdv)
 
 end
 
--- Load train data (incl. Gaussian normalization)
-function load_data(dataset, start_pic_num, pics)
 
-   if opt.dof == 1 then
-      label = torch.Tensor(pics)
-   else
-      label = torch.Tensor(pics, opt.dof)
+function load_data_dp(dataPath, validRatio)
+
+   local input = torch.Tensor(totalSize, 3, img_height, img_width)
+   local target = torch.IntTensor(totalSize)
+
+   for i = 1, totalSize do
+
+      local img = image.load(dataPath .. "genimgs/" .. (i - 1) .. ".png")
+      input[i] = img
+      target[i] = target_x[i]
+      collectgarbage()
    end
 
-   -- TODO: think about if a while loop is better here
-   i_prime = start_pic_num
+   local nValid = math.floor(totalSize * validRatio)
+   local nTrain = totalSize - nValid
 
-   for i = 1, pics do
+   local trainInput = dp.ImageView('bchw', input:narrow(1, 1, nTrain))
+   local trainTarget = dp.ClassView('b', target:narrow(1, 1, nTrain))
 
-      img = image.load(img_folder .. (i_prime - 1) .. ".png")
+   local validInput = dp.ImageView('bchw', input:narrow(1, nTrain+1, nValid))
+   local validTarget = dp.ClassView('b', target:narrow(1, nTrain+1, nValid))
 
-      img = image.scale(img, img_width, img_height)
-   
-      true_x = target_x[i_prime]
-      true_y = target_y[i_prime]
+   -- 3. wrap views into datasets
 
-      if not opt.regression then
-	 true_x = math.min(math.floor(true_x),  total_range)
-	 true_y = math.min(math.floor(true_y),  total_range)
-      end
-     
-      dataset.data[i] = img
+   local train = dp.DataSet{inputs=trainInput,targets=trainTarget,which_set='train'}
+   local valid = dp.DataSet{inputs=validInput,targets=validTarget,which_set='valid'}
 
-      -- Degrees of freedom
-      if opt.dof == 1 then
-         label[i] = true_x
-      else
-         label[i][1] = true_x
-      end
-      if opt.dof >= 2 then
-         label[i][2] = true_y
-      end
+   -- 4. wrap datasets into datasource
 
-      i_prime = i_prime + 1
+   local ds = dp.DataSource{train_set=train,valid_set=valid}
 
-      if opt.regression then
-	 dataset.label[i] = true_x
-      else
-	 dataset.label[i] = makeTargets1DNewImage(true_x, .15)
-
-      end
-       
-   end
-
+   return ds
 end
 
-load_data(trainset, 1, trsize)
-load_data(testset, trsize + 1, tesize)
+--[[data]]--
+ds = load_data_dp(opt.baseDir, 0.2)
 
 
-
---print(visualize_data(target_x))
---print(visualize_data(all_classes(trainset.label, 10)))
-
-
-function trainset:size() 
-    return self.data:size(1) 
+--[[preprocessing]]--
+local input_preprocess = {}
+if opt.standardize then
+   table.insert(input_preprocess, dp.Standardize())
 end
-
-setmetatable(trainset, 
-    {__index = function(t, i) 
-                    return {t.data[i], t.label[i]} 
-                end}
-);
-
-
-function testset:size() 
-    return self.data:size(1) 
+if opt.zca then
+   table.insert(input_preprocess, dp.ZCA())
 end
-
-setmetatable(testset, 
-    {__index = function(t, i) 
-                    return {t.data[i], t.label[i]} 
-                end}
-);
-
-
-----------------------------------------------------------------------
-print '==> preprocessing data'
-
-trainset.data = trainset.data:float() -- convert the data from a ByteTensor to a DoubleTensor.
-testset.data = testset.data:float() -- convert the data from a ByteTensor to a DoubleTensor.
-trainset.label = trainset.label:float() -- convert the data from a ByteTensor to a DoubleTensor.
-testset.label = testset.label:float() -- convert the data from a ByteTensor to a DoubleTensor.
-
-
--- Convert all images to YUV
-
-print '==> preprocessing data: colorspace RGB -> YUV'
-for i = 1, trainset:size() do
-   trainset.data[i] = image.rgb2yuv(trainset.data[i])
+if opt.lecunlcn then
+   table.insert(input_preprocess, dp.GCN())
+   table.insert(input_preprocess, dp.LeCunLCN{progress=true})
 end
-
-for i = 1, testset:size() do
-   testset.data[i] = image.rgb2yuv(testset.data[i])
-end
-
--- Name channels for convenience
-channels = {'y','u','v'}
-
--- Normalize each channel, and store mean/std
--- per channel. These values are important, as they are part of
--- the trainable parameters. At test time, test data will be normalized
--- using these values.
-
-print '==> preprocessing data: normalize each feature (channel) globally'
-mean = {}
-std = {}
-
-mean_target = trainset.label:mean()
-std_target = trainset.label:std()
-
-
-for i, channel in ipairs(channels) do
-   -- normalize each channel globally:
-   mean[i] = trainset.data[{ {},i,{},{} }]:mean()
-   std[i] = trainset.data[{ {},i,{},{} }]:std()
-
-   trainset.data[{ {},i,{},{} }]:add(-mean[i])
-   trainset.data[{ {},i,{},{} }]:div(std[i])
-
-end
-
-trainset.label:add(-mean_target)
-trainset.label:div(std_target)
-
-
--- Normalize test data, using the training means/stds
-for i, channel in ipairs(channels) do
-   -- normalize each channel globally:
-   testset.data[{ {},i,{},{} }]:add(-mean[i])
-   testset.data[{ {},i,{},{} }]:div(std[i])
-
-end
-
-testset.label:add(-mean_target)
-testset.label:div(std_target)
-
--- Local normalization
-print '==> preprocessing data: normalize all three channels locally'
-
--- Define the normalization neighborhood:
-neighborhood = image.gaussian1D(13)
-
--- Define our local normalization operator (It is an actual nn module, 
--- which could be inserted into a trainable model):
-normalization = nn.SpatialContrastiveNormalization(1, neighborhood, 1):float()
-
--- Normalize all channels locally:
-for c in ipairs(channels) do
-   for i = 1, trainset:size() do
-      trainset.data[{ i,{c},{},{} }] = normalization:forward(trainset.data[{ i,{c},{},{} }])
-   end
-   for i = 1, testset:size() do
-      testset.data[{ i,{c},{},{} }] = normalization:forward(testset.data[{ i,{c},{},{} }])
-   end
-end
-
-
-----------------------------------------------------------------------
-print '==> verify statistics'
-
-for i, channel in ipairs(channels) do
-   trainMean = trainset.data[{ {},i }]:mean()
-   trainStd = trainset.data[{ {},i }]:std()
-
-   testMean = testset.data[{ {},i }]:mean()
-   testStd = testset.data[{ {},i }]:std()
-
-   print('training data, '..channel..'-channel, mean: ' .. trainMean)
-   print('training data, '..channel..'-channel, standard deviation: ' .. trainStd)
-
-   print('test data, '..channel..'-channel, mean: ' .. testMean)
-   print('test data, '..channel..'-channel, standard deviation: ' .. testStd)
-end
-
-print '==> visualizing data'
-
-if opt.visualize then
-   first256Samples_y = trainset.data[{ {1,3},1 }]
-   first256Samples_u = trainset.data[{ {1,3},2 }]
-   first256Samples_v = trainset.data[{ {1,3},3 }]
---   image.display(first256Samples_y)
---   image.display(first256Samples_u)
---   image.display(first256Samples_v)
-   if itorch then
-      first256Samples_y = trainset.data[{ {1,3},1 }]
-      first256Samples_u = trainset.data[{ {1,3},2 }]
-      first256Samples_v = trainset.data[{ {1,3},3 }]
-      itorch.image(first256Samples_y)
-      itorch.image(first256Samples_u)
-      itorch.image(first256Samples_v)
-   end
-end
-
--- Take a 1D-tensor (e.g. with size 300), and split it into classes
--- For example, 1-30: class 1; 31 - 60: class 2; etc.
-function to_classes(predictions, classes) 
-
-   if opt.regression then
-
-      width = 35
-      pos = predictions[1]
-      pos = normalized_to_raw_num(pos, mean_target, std_target)
-
---      print("Pos is", pos)
-   else
-      len = predictions:size()
-      max, pos = predictions:max(1)
-      pos = pos[1]
-      width = len[1] / classes -- width of the bins
-   end
-
-   class = (math.floor((pos - 1) / width)) + 1
-
-   return math.min(math.max(class, 1), classes)
-   
-
-end
-
-function all_classes(labels, num_classes)
-  s = labels:size(1)
-  tmp_classes = torch.Tensor(s):fill(0)
-
-  for i=1, labels:size(1) do
-     if opt.regression then
-	class = to_classes(labels[i][1], 10)  
-     else
-	class = to_classes(labels[i][1], 10)  
-     end
-    tmp_classes[i] = class
-  end
-
-  return tmp_classes
-  
-end
-
-function all_classes_2d(labels, num_classes)
-  s = labels:size(1)
-  tmp_classes = torch.Tensor(s):fill(0)
-
-  for i=1, labels:size(1) do
-    class = to_classes(labels[i], 10)  
-    tmp_classes[i] = class
-  end
-
-  return tmp_classes
-  
-end
-
-

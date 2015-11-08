@@ -30,7 +30,7 @@ cmd:text('Options:')
 cmd:option('-seed', 43, 'fixed input seed for repeatable experiments')
 cmd:option('-threads', 3, 'number of threads')
 -- data:
-cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
+cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
 -- model:
 cmd:option('-model', 'bnmodel', 'type of model to construct: linear | mlp | convnet | volker')
 -- loss:
@@ -50,7 +50,7 @@ cmd:option('-type', 'float', 'type: double | float | cuda')
 cmd:option('-visualize', false, 'visualize weights of the network (true | false)')
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; 3:x, y, z.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
-cmd:option('-baseDir', '/scratch/vstrobel/locfiles/draug/', 'Base dir for images and targets')
+cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
 cmd:option('-regression', true, 'Base directory for images and targets')
 cmd:text()
 opt = cmd:parse(arg or {})

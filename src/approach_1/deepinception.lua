@@ -41,7 +41,7 @@ cmd:option('-incepPoolStride', '{}', 'The stride (height=width) of the spatial m
 -- dense layers
 cmd:option('-hiddenSize', '{}', 'size of the dense hidden layers after the convolution')
 -- misc
-cmd:option('-cuda', true, 'use CUDA')
+cmd:option('-cuda', false, 'use CUDA')
 cmd:option('-useDevice', 1, 'sets the device (GPU) to use')
 cmd:option('-maxEpoch', 1000, 'maximum number of epochs to run')
 cmd:option('-maxTries', 50, 'maximum number of epochs to try to find a better local minima for early-stopping')
@@ -117,11 +117,13 @@ end
 --[[Model]]--
 cnn = nn.Sequential()
 
+insize = {1,ds:imageSize('c'),ds:imageSize('h'),ds:imageSize('w')}
+
 -- convolutional and pooling layers
-insize = {1, 3, 224, 224}
-inputSize = insize[2]
+inputSize = ds:imageSize('c')
 depth = 1
-for i=1,#opt.convChannelSize do
+
+for i=1, #opt.convChannelSize do
    if opt.dropout and (opt.dropoutProb[depth] or 0) > 0 then
       -- dropout can be useful for regularization
       cnn:add(nn.SpatialDropout(opt.dropoutProb[depth]))
@@ -173,7 +175,7 @@ end
 
 -- get output size of convolutional layers
 outsize = cnn:outside(insize)
-inputSize = outsize[2]*outsize[3]*outsize[4]
+inputSize = outsize[2] * outsize[3] * outsize[4]
 dp.vprint(not opt.silent, "input to dense layers has: "..inputSize.." neurons")
 
 --cnn:insert(nn.Convert(trainset:ioShapes(), 'bchw'), 1)
@@ -198,10 +200,72 @@ if opt.dropout and (opt.dropoutProb[depth] or 0) > 0 then
    cnn:add(nn.Dropout(opt.dropoutProb[depth]))
 end
 
--- Convert the estimations to one prediction per coordinate
+-- If regression is desires, convert the estimations to one prediction per coordinate
 if opt.regression then
       cnn:add(nn.Linear(inputSize, opt.dof))
 end
 
+
+--[[Propagators]]--
+train = dp.Optimizer{
+   acc_update = opt.accUpdate,
+   loss = nn.ModuleCriterion(nn.MSECriterion(), nil, nn.Convert()),
+   callback = function(model, report) 
+      -- the ordering here is important
+      if opt.accUpdate then
+         model:accUpdateGradParameters(model.dpnn_input, model.output, opt.learningRate)
+      else
+         model:updateGradParameters(opt.momentum) -- affects gradParams
+         model:updateParameters(opt.learningRate) -- affects params
+      end
+      model:maxParamNorm(opt.maxOutNorm) -- affects params
+      model:zeroGradParameters() -- affects gradParams 
+   end,
+   feedback = dp.Confusion(),
+   sampler = dp.ShuffleSampler{batch_size = opt.batchSize},
+   progress = true
+}
+valid = dp.Evaluator{
+   feedback = dp.Confusion(),  
+   sampler = dp.Sampler{batch_size = opt.batchSize}
+}
+test = dp.Evaluator{
+   feedback = dp.Confusion(),
+   sampler = dp.Sampler{batch_size = opt.batchSize}
+}
+
+--[[Experiment]]--
+xp = dp.Experiment{
+   model = cnn,
+   optimizer = train,
+   validator = valid,
+   tester = test,
+   observer = {
+      dp.FileLogger(),
+      dp.EarlyStopper{
+         error_report = {'validator','feedback','confusion','accuracy'},
+         maximize = true,
+         max_epochs = opt.maxTries
+      }
+   },
+   random_seed = os.time(),
+   max_epoch = opt.maxEpoch
+}
+
+--[[GPU or CPU]]--
+if opt.cuda then
+   require 'cutorch'
+   require 'cunn'
+   cutorch.setDevice(opt.useDevice)
+   xp:cuda()
+end
+
+xp:verbose(not opt.silent)
+if not opt.silent then
+   print"Model :"
+   print(cnn)
+end
+
+xp:run(ds)
 
 return cnn
