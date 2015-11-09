@@ -36,7 +36,9 @@ end
 
 if opt.model == 'inception' then
 
-   model = require('deepinception')
+--   model = require('deepinception')
+--   require('deepinception')
+   print("Nice model")
 
 else
 

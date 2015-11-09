@@ -1,4 +1,5 @@
 require 'dp'
+require 'ddfeedbackclassification'
 
 --[[command line arguments]]--
 cmd = torch.CmdLine()
@@ -18,9 +19,9 @@ cmd:option('-batchNorm', true, 'use batch normalization. dropout is mostly redun
 cmd:option('-dropout', false, 'use dropout')
 cmd:option('-dropoutProb', '{0.2,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}', 'dropout probabilities')
 -- data and preprocessing
-cmd:option('-standardize', false, 'apply Standardize preprocessing')
-cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
-cmd:option('-lecunlcn', false, 'apply Yann LeCun Local Contrast Normalization (recommended)')
+cmd:option('-standardize', true, 'apply Standardize preprocessing')
+cmd:option('-zca', true, 'apply Zero-Component Analysis whitening')
+cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
 -- convolution layers (before Inception layers, 2 or 3 should do)
 cmd:option('-convChannelSize', '{64,128}', 'Number of output channels (number of filters) for each convolution layer.')
 cmd:option('-convKernelSize', '{5,5}', 'kernel size of each convolution layer. Height = Width')
@@ -41,7 +42,7 @@ cmd:option('-incepPoolStride', '{}', 'The stride (height=width) of the spatial m
 -- dense layers
 cmd:option('-hiddenSize', '{}', 'size of the dense hidden layers after the convolution')
 -- misc
-cmd:option('-cuda', false, 'use CUDA')
+cmd:option('-cuda', true, 'use CUDA')
 cmd:option('-useDevice', 1, 'sets the device (GPU) to use')
 cmd:option('-maxEpoch', 1000, 'maximum number of epochs to run')
 cmd:option('-maxTries', 50, 'maximum number of epochs to try to find a better local minima for early-stopping')
@@ -221,16 +222,16 @@ train = dp.Optimizer{
       model:maxParamNorm(opt.maxOutNorm) -- affects params
       model:zeroGradParameters() -- affects gradParams 
    end,
-   feedback = dp.Confusion(),
+   feedback = dp.ConfusionFeedback{name="confusionfeedback"},
    sampler = dp.ShuffleSampler{batch_size = opt.batchSize},
    progress = true
 }
 valid = dp.Evaluator{
-   feedback = dp.Confusion(),  
+   feedback = dp.ConfusionFeedback{name="confusionfeedback"},  
    sampler = dp.Sampler{batch_size = opt.batchSize}
 }
 test = dp.Evaluator{
-   feedback = dp.Confusion(),
+   feedback = dp.ConfusionFeedback{name="confusionfeedback"},
    sampler = dp.Sampler{batch_size = opt.batchSize}
 }
 
@@ -241,12 +242,12 @@ xp = dp.Experiment{
    validator = valid,
    tester = test,
    observer = {
-      dp.FileLogger(),
-      dp.EarlyStopper{
-         error_report = {'validator','feedback','confusion','accuracy'},
-         maximize = true,
-         max_epochs = opt.maxTries
-      }
+      dp.FileLogger()
+--      dp.EarlyStopper{
+--         error_report = {'validator','feedback','confusion','accuracy'},
+--         maximize = true,
+--         max_epochs = opt.maxTries
+--      }
    },
    random_seed = os.time(),
    max_epoch = opt.maxEpoch
@@ -266,6 +267,7 @@ if not opt.silent then
    print(cnn)
 end
 
+print("running now")
 xp:run(ds)
 
-return cnn
+--return cnn

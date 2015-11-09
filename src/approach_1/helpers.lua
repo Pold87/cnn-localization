@@ -1,3 +1,32 @@
+function normalized_to_raw(pred, mean_target, stdv_target)
+    
+    val = pred:clone()
+    val = val:cmul(stdv_target)
+    val = val:add(mean_target)
+    
+    return val 
+end
+
+
+function normalized_to_raw_num(pred, mean_target, stdv_target)
+    
+    val = pred
+    val = val * stdv_target
+    val = val + mean_target
+    
+    return val 
+end
+
+
+function raw_to_normalized(pred, mean_target, stdv_target)
+    
+    val = pred:clone()
+    val = val:add(- mean_target)
+    val = val:cdiv(stdv_target)
+    
+    return val 
+end
+
 -- Sleep for a specified time in seconds
 function sleep(n)
   os.execute("sleep " .. tonumber(n))

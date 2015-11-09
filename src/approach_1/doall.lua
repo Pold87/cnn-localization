@@ -30,7 +30,7 @@ cmd:text('Options:')
 cmd:option('-seed', 43, 'fixed input seed for repeatable experiments')
 cmd:option('-threads', 3, 'number of threads')
 -- data:
-cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
+cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
 -- model:
 cmd:option('-model', 'bnmodel', 'type of model to construct: linear | mlp | convnet | volker')
 -- loss:
@@ -52,18 +52,22 @@ cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; 3:x, 
 cmd:option('-saveModel', true, 'Save model after each iteration')
 cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
 cmd:option('-regression', true, 'Base directory for images and targets')
+cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
+cmd:option('-standardize', true, 'apply Standardize preprocessing')
+cmd:option('-zca', true, 'apply Zero-Component Analysis whitening')
+
 cmd:text()
 opt = cmd:parse(arg or {})
 
 -- nb of threads and fixed seed (for repeatable experiments)
-if opt.type == 'float' then
-   print('==> switching to floats')
-   torch.setdefaulttensortype('torch.FloatTensor')
-elseif opt.type == 'cuda' then
-   print('==> switching to CUDA')
-   require 'cunn'
-   torch.setdefaulttensortype('torch.FloatTensor')
-end
+--if opt.type == 'float' then
+--  print('==> switching to floats')
+--   torch.setdefaulttensortype('torch.FloatTensor')
+--elseif opt.type == 'cuda' then
+--   print('==> switching to CUDA')
+--   require 'cunn'
+--   torch.setdefaulttensortype('torch.FloatTensor')
+--end
 torch.setnumthreads(opt.threads)
 torch.manualSeed(opt.seed)
 
@@ -71,10 +75,10 @@ torch.manualSeed(opt.seed)
 print '==> executing all'
 
 dofile 'data.lua'
-dofile 'model.lua'
-dofile 'loss.lua'
-dofile 'train.lua'
-dofile 'test.lua'
+dofile 'deepinception.lua'
+--dofile 'loss.lua'
+--dofile 'train.lua'
+--dofile 'test.lua'
 
 ----------------------------------------------------------------------
 print '==> training!'
@@ -84,7 +88,7 @@ print '==> training!'
 --   test()
 --end
 
-for i=1, 50 do
-    train()
-    test()
-end
+--for i=1, 50 do
+--    train()
+--    test()
+--end

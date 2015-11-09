@@ -1,5 +1,6 @@
 require 'torch'
 require 'nn'
+require 'cunn'
 require 'image'
 require 'math'
 require 'csvigo'
@@ -16,14 +17,15 @@ if not opt then
    cmd:text('Drone Dataset Preprocessing')
    cmd:text()
    cmd:text('Options:')
-   cmd:option('-size', 'small', 'how many samples do we load: small | full | extra')
+   cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
    cmd:option('-visualize', false, 'visualize input data and weights during training')
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
    cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
    cmd:option('-regression', true, 'Base directory for images and targets')
-   cmd:option('-standardize', false, 'apply Standardize preprocessing')
-   cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
+   cmd:option('-standardize', true, 'apply Standardize preprocessing')
+   cmd:option('-zca', true, 'apply Zero-Component Analysis whitening')
    cmd:option('-scaleImages', false, 'scale input images to 224 x 224')
+   cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
@@ -47,7 +49,7 @@ if opt.size == 'full' then
    -- 510 worked perfectly
    trsize = 2500 -- training images
    tesize = 300 -- test images
-   totalSize = 5000
+   totalSize = 1000
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40
@@ -71,50 +73,6 @@ end
 local target_x = torch.Tensor(csv_file.x)
 local target_y = torch.Tensor(csv_file.y)
 local target_z = torch.Tensor(csv_file.z)
-
-
-trainset = {
-   data = torch.Tensor(trsize, 3, img_width, img_height),
-   label = torch.FloatTensor(trsize, opt.dof, total_range),
-   size = function() return trsize end
-}
-
-testset = {
-   data = torch.Tensor(tesize, 3, img_width, img_height),
-   label = torch.FloatTensor(tesize, opt.dof, total_range),
-   size = function() return tesize end
-}
-
-
-function normalized_to_raw(pred, mean_target, stdv_target)
-    
-    val = pred:clone()
-    val = val:cmul(stdv_target)
-    val = val:add(mean_target)
-    
-    return val 
-end
-
-
-function normalized_to_raw_num(pred, mean_target, stdv_target)
-    
-    val = pred
-    val = val * stdv_target
-    val = val + mean_target
-    
-    return val 
-end
-
-
-function raw_to_normalized(pred, mean_target, stdv_target)
-    
-    val = pred:clone()
-    val = val:add(- mean_target)
-    val = val:cdiv(stdv_target)
-    
-    return val 
-end
-
 
 
 function visualize_data(targets)
@@ -151,13 +109,13 @@ end
 
 function load_data_dp(dataPath, validRatio)
 
-   local input = torch.Tensor(totalSize, 3, img_height, img_width)
-   local target = torch.IntTensor(totalSize)
+   local input = torch.CudaTensor(totalSize, 3, img_height, img_width)
+   local target = torch.CudaTensor(totalSize)
 
    for i = 1, totalSize do
 
       local img = image.load(dataPath .. "genimgs/" .. (i - 1) .. ".png")
-      input[i] = img
+      input[i] = image.rgb2yuv(img)
       target[i] = target_x[i]
       collectgarbage()
    end
@@ -166,10 +124,10 @@ function load_data_dp(dataPath, validRatio)
    local nTrain = totalSize - nValid
 
    local trainInput = dp.ImageView('bchw', input:narrow(1, 1, nTrain))
-   local trainTarget = dp.ClassView('b', target:narrow(1, 1, nTrain))
+   local trainTarget = dp.DataView('b', target:narrow(1, 1, nTrain))
 
    local validInput = dp.ImageView('bchw', input:narrow(1, nTrain+1, nValid))
-   local validTarget = dp.ClassView('b', target:narrow(1, nTrain+1, nValid))
+   local validTarget = dp.DataView('b', target:narrow(1, nTrain+1, nValid))
 
    -- 3. wrap views into datasets
 
@@ -185,17 +143,44 @@ end
 
 --[[data]]--
 ds = load_data_dp(opt.baseDir, 0.2)
+st = dp.Standardize()
 
+trainTargets = ds:trainSet():targets()
+validTargets = ds:validSet():targets()
+
+--trainInputs = ds:get('train', 'inputs', 'bhw')
+--validInputs = ds:get('valid', 'inputs', 'bhw')
+
+trainInputs = ds:trainSet():inputs()
+validInputs = ds:validSet():inputs()
+
+st:apply(trainTargets, true)
+st:apply(validTargets, false)
 
 --[[preprocessing]]--
 local input_preprocess = {}
 if opt.standardize then
    table.insert(input_preprocess, dp.Standardize())
+   staImages = dp.Standardize()
+   staImages:apply(trainInputs, true)
+   staImages:apply(validInputs, false)
+
 end
 if opt.zca then
    table.insert(input_preprocess, dp.ZCA())
+
+   zca = dp.ZCA()
+   zca:apply(trainInputs)
+   zca:apply(validInputs)
 end
 if opt.lecunlcn then
    table.insert(input_preprocess, dp.GCN())
    table.insert(input_preprocess, dp.LeCunLCN{progress=true})
+
+   gcn = dp.GCN()
+   lec = dp.LeCunLCN{progress=true}
+
+   gcn:apply(trainInputs)
+   gcn:apply(validInputs)
+   
 end
