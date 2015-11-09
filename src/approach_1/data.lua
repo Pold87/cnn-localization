@@ -164,7 +164,6 @@ if opt.standardize then
    staImages = dp.Standardize()
    staImages:apply(trainInputs, true)
    staImages:apply(validInputs, false)
-
 end
 if opt.zca then
    table.insert(input_preprocess, dp.ZCA())
