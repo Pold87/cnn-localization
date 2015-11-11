@@ -7,6 +7,7 @@ require 'csvigo'
 require 'distributions'
 require 'gnuplot'
 require 'dp'
+require 'helpers'
 
 
 -- parse command line arguments
@@ -25,7 +26,8 @@ if not opt then
    cmd:option('-standardize', false, 'apply Standardize preprocessing')
    cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
    cmd:option('-scaleImages', false, 'scale input images to 224 x 224')
-   cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
+   cmd:option('-lecunlcn', false, 'apply Yann LeCun Local Contrast Normalization (recommended)')
+   cmd:option('-manPrepro', true, 'Apply preprocessing from torch supervised tutorials')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
@@ -49,7 +51,7 @@ if opt.size == 'full' then
    -- 510 worked perfectly
    trsize = 2500 -- training images
    tesize = 300 -- test images
-   totalSize = 1000
+   totalSize = 400
 elseif opt.size == 'small' then
    print '==> using reduced training data, for fast experiments'
    trsize = 40
@@ -109,8 +111,8 @@ end
 
 function load_data_dp(dataPath, validRatio)
 
-   local input = torch.CudaTensor(totalSize, 3, img_height, img_width)
-   local target = torch.CudaTensor(totalSize)
+   local input = torch.Tensor(totalSize, 3, img_height, img_width)
+   local target = torch.Tensor(totalSize)
 
    for i = 1, totalSize do
 
@@ -120,8 +122,8 @@ function load_data_dp(dataPath, validRatio)
       collectgarbage()
    end
 
-   local nValid = math.floor(totalSize * validRatio)
-   local nTrain = totalSize - nValid
+   nValid = math.floor(totalSize * validRatio)
+   nTrain = totalSize - nValid
 
    local trainInput = dp.ImageView('bchw', input:narrow(1, 1, nTrain))
    local trainTarget = dp.DataView('b', target:narrow(1, 1, nTrain))
@@ -143,7 +145,6 @@ end
 
 --[[data]]--
 ds = load_data_dp(opt.baseDir, 0.2)
-st = dp.Standardize()
 
 trainTargets = ds:trainSet():targets()
 validTargets = ds:validSet():targets()
@@ -151,32 +152,122 @@ validTargets = ds:validSet():targets()
 trainInputs = ds:trainSet():inputs()
 validInputs = ds:validSet():inputs()
 
-st:apply(trainTargets, true)
-st:apply(validTargets, false)
 
 --[[preprocessing]]--
 local input_preprocess = {}
 if opt.standardize then
-   table.insert(input_preprocess, dp.Standardize())
+
+   st = dp.Standardize()
+
+   st:apply(trainTargets, true)
+   st:apply(validTargets, false)
+
+
    staImages = dp.Standardize()
    staImages:apply(trainInputs, true)
    staImages:apply(validInputs, false)
 end
 if opt.zca then
-   table.insert(input_preprocess, dp.ZCA())
 
    zca = dp.ZCA()
-   zca:apply(trainInputs)
-   zca:apply(validInputs)
+   zca:apply(trainInputs, true)
+   zca:apply(validInputs, false)
 end
 if opt.lecunlcn then
-   table.insert(input_preprocess, dp.GCN())
-   table.insert(input_preprocess, dp.LeCunLCN{progress=true})
 
    gcn = dp.GCN()
-   lec = dp.LeCunLCN{progress=true}
+   gcn:apply(trainInputs, true)
+   gcn:apply(validInputs, false)
 
-   gcn:apply(trainInputs)
-   gcn:apply(validInputs)
+   lec = dp.LeCunLCN{progress=true}
+   lec:apply(trainInputs, true)
+   lec:apply(validInputs, false)
    
 end
+
+
+if opt.manPrepro then
+
+   print("Manually proprocessing everything")
+
+   -- Name channels for convenience
+   channels = {'y','u','v'}
+   
+   -- Local normalization
+   print '==> preprocessing data: normalize all three channels locally'
+
+   -- Normalize each channel, and store mean/std
+   -- per channel. These values are important, as they are part of
+   -- the trainable parameters. At test time, test data will be normalized
+   -- using these values.
+
+   print '==> preprocessing data: normalize each feature (channel) globally'
+   mean = {}
+   std = {}
+
+   local trainInputsT = trainInputs:forward('bchw')
+   local validInputsT = validInputs:forward('bchw')
+   local trainTargetsT = trainTargets:forward('b')
+   local validTargetsT = validTargets:forward('b')
+
+
+   mean_target = trainTargetsT:mean()
+   std_target = trainTargetsT:std()
+
+   trainTargetsT:add(-mean_target)
+   trainTargetsT:div(std_target)
+
+   validTargetsT:add(-mean_target)
+   validTargetsT:div(std_target)
+
+
+   for i, channel in ipairs(channels) do
+      -- normalize each channel globally:
+      mean[i] = trainInputsT[{ {}, i, {}, {} }]:mean()
+      std[i] = trainInputsT[{ {}, i, {}, {} }]:std()
+      
+      trainInputsT[{ {},i, {},{} }]:add(-mean[i])
+      trainInputsT[{ {},i, {},{} }]:div(std[i])
+      
+   end
+
+   -- Normalize test data, using the training means/stds
+   for i, channel in ipairs(channels) do
+      -- normalize each channel globally:
+      validInputsT:add(-mean[i])
+      validInputsT:div(std[i])
+      
+   end
+     
+   
+   -- Define the normalization neighborhood:
+   neighborhood = image.gaussian1D(13)
+   
+   -- Define our local normalization operator (It is an actual nn module, 
+   -- which could be inserted into a trainable model):
+   normalization = nn.SpatialContrastiveNormalization(1, neighborhood, 1)
+   
+      -- Normalize all channels locally:
+   for c in ipairs(channels) do
+      for i = 1, trainInputs:nSample() do
+	 trainInputsT[{ i, {c}, {}, {} }] = normalization:forward(trainInputsT[{ i, {c}, {}, {} }])
+      end
+      for i = 1, validInputs:nSample() do
+	 validInputsT[{ i, {c}, {}, {} }] = normalization:forward(validInputsT[{ i, {c}, {}, {} }])
+      end
+   end   
+
+   ds:set('train', 'input', 'bchw', trainInputsT)
+   ds:set('valid', 'input', 'bchw', validInputsT)
+
+   ds:set('train', 'target', 'b', trainTargetsT)
+   ds:set('valid', 'target', 'b', validTargetsT)
+
+  
+end
+
+
+ds = convertDataSetToCuda(ds)
+
+
+

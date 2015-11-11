@@ -52,9 +52,13 @@ cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; 3:x, 
 cmd:option('-saveModel', true, 'Save model after each iteration')
 cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
 cmd:option('-regression', true, 'Base directory for images and targets')
-cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
+cmd:option('-lecunlcn', false, 'apply Yann LeCun Local Contrast Normalization (recommended)')
 cmd:option('-standardize', false, 'apply Standardize preprocessing')
 cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
+cmd:option('-manPrepro', true, 'Apply preprocessing from torch supervised tutorials')
+
+cmd:option('-dropout', false, 'use dropout')
+cmd:option('-dropoutProb', '{0.2,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}', 'dropout probabilities')
 
 cmd:text()
 opt = cmd:parse(arg or {})

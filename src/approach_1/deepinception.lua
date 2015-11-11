@@ -16,11 +16,11 @@ cmd:option('-dontPad', false, 'dont add math.floor(kernelSize/2) padding to the 
 -- regularization (and dropout or batchNorm)
 cmd:option('-maxOutNorm', 1, 'max norm each layers output neuron weights')
 cmd:option('-batchNorm', true, 'use batch normalization. dropout is mostly redundant with this')
-cmd:option('-dropout', false, 'use dropout')
+cmd:option('-dropout', true, 'use dropout')
 cmd:option('-dropoutProb', '{0.2,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}', 'dropout probabilities')
 -- data and preprocessing
 cmd:option('-standardize', true, 'apply Standardize preprocessing')
-cmd:option('-zca', true, 'apply Zero-Component Analysis whitening')
+cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
 cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
 -- convolution layers (before Inception layers, 2 or 3 should do)
 cmd:option('-convChannelSize', '{64,128}', 'Number of output channels (number of filters) for each convolution layer.')
@@ -98,22 +98,6 @@ opt.incepPoolStride = table.fromString(opt.incepPoolStride)
 opt.dropoutProb = table.fromString(opt.dropoutProb)
 opt.hiddenSize = table.fromString(opt.hiddenSize)
 
---[[preprocessing]]--
-local input_preprocess = {}
-if opt.standardize then
-   table.insert(input_preprocess, dp.Standardize())
-end
-if opt.zca then
-   table.insert(input_preprocess, dp.ZCA())
-end
-if opt.lecunlcn then
-   table.insert(input_preprocess, dp.GCN())
-   table.insert(input_preprocess, dp.LeCunLCN{progress=true})
-end
-
-if not (opt.dropout or opt.batchNorm) then
-   print"You should probably try --dropout or --batchNorm (because the model is so deep)"
-end
 
 --[[Model]]--
 cnn = nn.Sequential()
@@ -201,7 +185,7 @@ if opt.dropout and (opt.dropoutProb[depth] or 0) > 0 then
    cnn:add(nn.Dropout(opt.dropoutProb[depth]))
 end
 
--- If regression is desires, convert the estimations to one prediction per coordinate
+-- If regression is desired, convert the estimations to one prediction per coordinate
 if opt.regression then
       cnn:add(nn.Linear(inputSize, opt.dof))
 end
@@ -210,7 +194,8 @@ end
 --[[Propagators]]--
 train = dp.Optimizer{
    acc_update = opt.accUpdate,
-   loss = nn.ModuleCriterion(nn.MSECriterion(), nil, nn.Convert()),
+--   loss = nn.ModuleCriterion(nn.MSECriterion(), nil, nn.Convert()),
+   loss = nn.MSECriterion(),
    callback = function(model, report) 
       -- the ordering here is important
       if opt.accUpdate then
@@ -226,12 +211,9 @@ train = dp.Optimizer{
    sampler = dp.ShuffleSampler{batch_size = opt.batchSize},
    progress = true
 }
+
 valid = dp.Evaluator{
    feedback = dp.ConfusionFeedback{name="confusionfeedback"},  
-   sampler = dp.Sampler{batch_size = opt.batchSize}
-}
-test = dp.Evaluator{
-   feedback = dp.ConfusionFeedback{name="confusionfeedback"},
    sampler = dp.Sampler{batch_size = opt.batchSize}
 }
 
@@ -240,26 +222,19 @@ xp = dp.Experiment{
    model = cnn,
    optimizer = train,
    validator = valid,
-   tester = test,
+   tester = nil,
    observer = {
       dp.FileLogger()
---      dp.EarlyStopper{
---         error_report = {'validator','feedback','confusion','accuracy'},
---         maximize = true,
---         max_epochs = opt.maxTries
---      }
    },
-   random_seed = os.time(),
+   random_seed = 43,
    max_epoch = opt.maxEpoch
 }
 
 --[[GPU or CPU]]--
-if opt.cuda then
-   require 'cutorch'
-   require 'cunn'
-   cutorch.setDevice(opt.useDevice)
-   xp:cuda()
-end
+require 'cutorch'
+require 'cunn'
+cutorch.setDevice(opt.useDevice)
+xp:cuda()
 
 xp:verbose(not opt.silent)
 if not opt.silent then

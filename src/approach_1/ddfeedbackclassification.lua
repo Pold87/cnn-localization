@@ -70,11 +70,25 @@ function ConfusionFeedback:_add(batch, output, report)
       act = self._actf
    end
 
-   act:mul(st._std[1][1] + st._std_eps)
-   tgt:mul(st._std[1][1] + st._std_eps)
+   local meanT, stdvT
 
-   act:add(st._mean[1][1])
-   tgt:add(st._mean[1][1])
+   if st then
+      meanT = st._mean[1][1]
+      stdvT = st._std[1][1] + st._std_eps
+   else
+      print("Using old preprop")
+      meanT = mean_target
+      stdvT = std_target
+   end
+
+   act = act:float()
+   tgt = tgt:float()
+
+   act:mul(stdvT)
+   tgt:mul(stdvT)
+
+   act:add(meanT)
+   tgt:add(meanT)
 
 --   print("act", act)
 --   print("tgt", tgt)

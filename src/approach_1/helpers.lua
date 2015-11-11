@@ -88,3 +88,30 @@ function all_classes_2d(labels, num_classes)
   return tmp_classes
   
 end
+
+
+function convertDataSetToCuda(dataSet)
+
+   local trainTensor = dataSet:get('train','input', 'default', 'torch.CudaTensor')
+   local validTensor = dataSet:get('valid','input', 'default', 'torch.CudaTensor')
+
+   local trainTarget = dataSet:get('train','target', 'default', 'torch.CudaTensor')
+   local validTarget = dataSet:get('valid','target', 'default', 'torch.CudaTensor')
+
+
+   local trainInput = dp.ImageView('bchw', trainTensor)
+   local trainTargetView = dp.DataView('b', trainTarget)
+
+   local validInput = dp.ImageView('bchw', validTensor)
+   local validTargetView = dp.DataView('b', validTarget)
+
+   local train = dp.DataSet{inputs=trainInput, targets=trainTargetView, which_set='train'}
+   local valid = dp.DataSet{inputs=validInput, targets=validTargetView, which_set='valid'}
+
+   -- 4. wrap datasets into datasource
+
+   local ds = dp.DataSource{train_set=train,valid_set=valid}
+
+   return ds
+
+end
