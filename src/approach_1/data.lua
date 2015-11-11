@@ -22,8 +22,8 @@ if not opt then
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
    cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
    cmd:option('-regression', true, 'Base directory for images and targets')
-   cmd:option('-standardize', true, 'apply Standardize preprocessing')
-   cmd:option('-zca', true, 'apply Zero-Component Analysis whitening')
+   cmd:option('-standardize', false, 'apply Standardize preprocessing')
+   cmd:option('-zca', false, 'apply Zero-Component Analysis whitening')
    cmd:option('-scaleImages', false, 'scale input images to 224 x 224')
    cmd:option('-lecunlcn', true, 'apply Yann LeCun Local Contrast Normalization (recommended)')
    cmd:text()
@@ -147,9 +147,6 @@ st = dp.Standardize()
 
 trainTargets = ds:trainSet():targets()
 validTargets = ds:validSet():targets()
-
---trainInputs = ds:get('train', 'inputs', 'bhw')
---validInputs = ds:get('valid', 'inputs', 'bhw')
 
 trainInputs = ds:trainSet():inputs()
 validInputs = ds:validSet():inputs()
