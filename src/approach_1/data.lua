@@ -252,7 +252,6 @@ end
 ds = load_data_dp(opt.baseDir, 0.2)
 
 
-
 --[[preprocessing]]--
 local input_preprocess = {}
 if opt.standardize then
@@ -264,4 +263,82 @@ end
 if opt.lecunlcn then
    table.insert(input_preprocess, dp.GCN())
    table.insert(input_preprocess, dp.LeCunLCN{progress=true})
+end
+
+
+trainData = ds:get('train', 'input', 'default') 
+testData = ds:get('valid', 'input', 'default')
+
+trainTargets = ds:get('train', 'target', 'default') 
+testTargets = ds:get('valid', 'target', 'default')
+
+print(trainTargets)
+
+st = dp.Standardize()
+st:apply(trainTargets, true)
+st:apply(validTargets, false)
+
+-- Name channels for convenience
+channels = {'y','u','v'}
+
+-- Normalize each channel, and store mean/std
+-- per channel. These values are important, as they are part of
+-- the trainable parameters. At test time, test data will be normalized
+-- using these values.
+print '==> preprocessing data: normalize each feature (channel) globally'
+mean = {}
+std = {}
+for i,channel in ipairs(channels) do
+   -- normalize each channel globally:
+   mean[i] = trainData.data[{ {},i,{},{} }]:mean()
+   std[i] = trainData.data[{ {},i,{},{} }]:std()
+   trainData.data[{ {},i,{},{} }]:add(-mean[i])
+   trainData.data[{ {},i,{},{} }]:div(std[i])
+end
+
+-- Normalize test data, using the training means/stds
+for i,channel in ipairs(channels) do
+   -- normalize each channel globally:
+   testData.data[{ {},i,{},{} }]:add(-mean[i])
+   testData.data[{ {},i,{},{} }]:div(std[i])
+end
+
+-- Local normalization
+print '==> preprocessing data: normalize all three channels locally'
+
+-- Define the normalization neighborhood:
+neighborhood = image.gaussian1D(13)
+
+-- Define our local normalization operator (It is an actual nn module, 
+-- which could be inserted into a trainable model):
+normalization = nn.SpatialContrastiveNormalization(1, neighborhood, 1):float()
+
+-- Normalize all channels locally:
+for c in ipairs(channels) do
+   for i = 1,trainData:size() do
+      trainData.data[{ i,{c},{},{} }] = normalization:forward(trainData.data[{ i,{c},{},{} }])
+   end
+   for i = 1,testData:size() do
+      testData.data[{ i,{c},{},{} }] = normalization:forward(testData.data[{ i,{c},{},{} }])
+   end
+end
+
+----------------------------------------------------------------------
+print '==> verify statistics'
+
+-- It's always good practice to verify that data is properly
+-- normalized.
+
+for i,channel in ipairs(channels) do
+   trainMean = trainData.data[{ {},i }]:mean()
+   trainStd = trainData.data[{ {},i }]:std()
+
+   testMean = testData.data[{ {},i }]:mean()
+   testStd = testData.data[{ {},i }]:std()
+
+   print('training data, '..channel..'-channel, mean: ' .. trainMean)
+   print('training data, '..channel..'-channel, standard deviation: ' .. trainStd)
+
+   print('test data, '..channel..'-channel, mean: ' .. testMean)
+   print('test data, '..channel..'-channel, standard deviation: ' .. testStd)
 end
