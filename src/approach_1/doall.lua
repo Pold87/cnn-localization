@@ -1,29 +1,11 @@
-----------------------------------------------------------------------
--- This tutorial shows how to train different models on the street
--- view house number dataset (SVHN),
--- using multiple optimization techniques (SGD, ASGD, CG), and
--- multiple types of models.
---
--- This script demonstrates a classical example of training 
--- well-known models (convnet, MLP, logistic regression)
--- on a 10-class classification problem. 
---
--- It illustrates several points:
--- 1/ description of the model
--- 2/ choice of a loss function (criterion) to minimize
--- 3/ creation of a dataset as a simple Lua table
--- 4/ description of training and test procedures
---
--- Clement Farabet
-----------------------------------------------------------------------
+
 require 'torch'
 
-----------------------------------------------------------------------
 print '==> processing options'
 
 cmd = torch.CmdLine()
 cmd:text()
-cmd:text('Deep Drone Loss Function')
+cmd:text('### DeepDrone  - We need to go deeper ###')
 cmd:text()
 cmd:text('Options:')
 -- global:
@@ -38,7 +20,7 @@ cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | ma
 -- training:
 cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
 cmd:option('-plot', false, 'live plot')
-cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
+cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS | ADADELTA | ADAGRAD (recommended)')
 cmd:option('-learningRate', 5e-2, 'learning rate at t=0')
 cmd:option('-batchSize', 5, 'mini-batch size (1 = pure stochastic)')
 cmd:option('-batchForward', true, 'Forward input in batches or in a loop')
@@ -51,7 +33,7 @@ cmd:option('-visualize', false, 'visualize weights of the network (true | false)
 cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; 3:x, y, z.')
 cmd:option('-saveModel', true, 'Save model after each iteration')
 cmd:option('-baseDir', '/scratch/vstrobel/locfiles/draug/', 'Base dir for images and targets')
-cmd:option('-regression', true, 'Base directory for images and targets')
+cmd:option('-regression', true, 'Regression or classification')
 cmd:text()
 opt = cmd:parse(arg or {})
 
@@ -79,12 +61,8 @@ dofile 'test.lua'
 ----------------------------------------------------------------------
 print '==> training!'
 
---while true do
---   train()
---   test()
---end
-
-for i=1, 50 do
-    train()
-    test()
+-- Train and test forever (or until one stops the script)
+while true do
+   train()
+   test()
 end

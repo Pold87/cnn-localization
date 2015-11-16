@@ -229,13 +229,6 @@ elseif opt.model == 'allconv' then
 
 elseif opt.model == 'allconvbn' then
 
-   -- THIS IS KILLER
-   -- BATCH NORM RULEZ !1!11!!
-
--- Worked perfectly with qlua
---  doall.lua -batchSize 7 -model allconvbn -optimization ADAGRAD 
-
-
    model = nn.Sequential()
 
    model:add(nn.SpatialConvolution(3, 8, 3, 3))
@@ -266,13 +259,6 @@ elseif opt.model == 'allconvbn' then
 
 
 elseif opt.model == 'allconvbn2' then
-
-   -- THIS IS KILLER
-   -- BATCH NORM RULEZ !1!11!!
-
--- Worked perfectly with qlua
---  doall.lua -batchSize 7 -model allconvbn -optimization ADAGRAD 
-
 
    model = nn.Sequential()
 
@@ -341,36 +327,16 @@ elseif opt.model == 'volkersimple' then
 
    model:add(nn.Linear(112 * 112 * 3, opt.dof * total_range))
 
-elseif opt.model == 'alexnet' then
+elseif opt.model == 'inception' then
 
-   print("Model", model)	
    model = require('deepinception')
-   print("Model", model)
---   model:add(nn.Reshape(opt.dof, total_range))
 
 else
 
-   error('unknown -model')
+   error('unknown model')
 
 end
 
 ----------------------------------------------------------------------
-print '==> here is the model:'
+print '==> Model architecture:'
 print(model)
-
-----------------------------------------------------------------------
--- Visualization is quite easy, using itorch.image().
-
-if opt.visualize then
-   if opt.model == 'convnet' then
-      if itorch then
-	 print '==> visualizing ConvNet filters'
-	 print('Layer 1 filters:')
-	 itorch.image(model:get(1).weight)
-	 print('Layer 2 filters:')
-	 itorch.image(model:get(5).weight)
-      else
-	 print '==> To visualize filters, start the script in itorch notebook'
-      end
-   end
-end

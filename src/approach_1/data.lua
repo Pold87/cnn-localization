@@ -20,35 +20,24 @@ if not opt then
    cmd:option('-dof', 1, 'degrees of freedom; 1: only x coordinates, 2: x, y; etc.')
    cmd:option('-baseDir', '/home/pold/Documents/draug/', 'Base dir for images and targets')
    cmd:option('-regression', true, 'Base directory for images and targets')
-   cmd:option('--standardize', false, 'apply Standardize preprocessing')
-   cmd:option('--zca', false, 'apply Zero-Component Analysis whitening')
    cmd:text()
    opt = cmd:parse(arg or {})
 end
 
 
 -- Settings
---src = image.load("../../data/dice.jpg")
---img_folder = "../../data/genimgs/"
 
 base_dir = opt.baseDir
 
-src = image.load(base_dir .. "img/popart_q.jpg")
+-- Folder of draug images
 img_folder = base_dir .. "genimgs/"
 csv_file = csvigo.load(base_dir .. "targets.csv")
 
-
-use_opencl = false
-max_iterations = 50
-
--- Amount of synthetic views
-
 ----------------------------------------------------------------------
--- training/test size
+-- training/test size (Amount of synthetic views)
 
 if opt.size == 'full' then
    print '==> using regular, full training data'
-   -- 510 worked perfectly
    trsize = 2500 -- training images
    tesize = 300 -- test images
 elseif opt.size == 'small' then
@@ -56,16 +45,13 @@ elseif opt.size == 'small' then
    trsize = 40
    tesize = 40
 elseif opt.size == 'xsmall' then
-   print '==> using reduced training data, for fast experiments'
+   print '==> using reduced training data, for extremely fast experiments'
    trsize = 8
    tesize = 8
 end
 
 img_width = 224
 img_height = 224
-
-x_range = img_width * 2
-y_range = img_height * 2
 
 if opt.regression then 
    total_range = 1
@@ -79,14 +65,12 @@ target_y = torch.Tensor(csv_file.y)
 target_z = torch.Tensor(csv_file.z)
 
 
--- Start by predicting the x coordinate
 trainset = {
    data = torch.Tensor(trsize, 3, img_width, img_height),
    label = torch.FloatTensor(trsize, opt.dof, total_range),
    size = function() return trsize end
 }
 
--- Start by predicting the x coordinate
 testset = {
    data = torch.Tensor(tesize, 3, img_width, img_height),
    label = torch.FloatTensor(tesize, opt.dof, total_range),
@@ -94,6 +78,10 @@ testset = {
 }
 
 
+-- These are some helper functions that are able to convert
+-- standardized targets to raw targets They are needed because the MSE
+-- of the normal targets gets otherwise too big and the network does
+-- not train.
 function normalized_to_raw(pred, mean_target, stdv_target)
     
     val = pred:clone()
@@ -124,9 +112,6 @@ function raw_to_normalized(pred, mean_target, stdv_target)
 end
 
 
-
-
-
 function visualize_data(targets)
 
    print(targets)
@@ -143,68 +128,6 @@ function sleep(n)
 end
 
 
-function makeTargets(y, stdv)
-   -- y : (batch_size, num_keypoints*2)
-   -- Y : (batch_size, num_keypoints*2, 98)
-   Y = torch.FloatTensor(y:size(1), y:size(2), total_range):zero()
-   pixels = torch.range(1,total_range):float()
-   local k = 0
-   for i=1,y:size(1) do
-      local keypoints = y[i]
-      local new_keypoints = Y[i]
-      for j=1,y:size(2) do
-         local kp = keypoints[j]
-         if kp ~= -1 then
-            local new_kp = new_keypoints[j]
-            new_kp:add(pixels, -kp)
-            new_kp:cmul(new_kp)
-            new_kp:div(2 * stdv * stdv)
-            new_kp:mul(-1)
-            new_kp:exp(new_kp)
-            new_kp:div(math.sqrt(2 * math.pi) * stdv)
-         else
-            k = k + 1
-         end
-      end
-   end
-   return Y
-end
-
-function makeTargets1D(y, stdv)
-   -- y : (batch_size, num_keypoints*2)
-   -- Y : (batch_size, num_keypoints*2, 98)
-   
-   Y = torch.FloatTensor(total_range):zero()
-   pixels = torch.range(1,total_range):float()
-   local k = 0
-   local new_keypoints = Y
-   for j=1, Y:size(1) do
-         local new_kp = new_keypoints[j]
-         new_kp = pixels - y
-         new_kp = new_kp * new_kp
-         new_kp = new_kp / (2 * stdv * stdv)
-         new_kp = - new_kp
-         new_kp = math.exp(new_kp)
-         new_kp = new_kp / (math.sqrt(2 * math.pi) * stdv)
-   end
-   return Y
-end
-
-
-function makeTargets1DNew(y, stdv)
-
-   Y = torch.FloatTensor(total_range):zero()
-
-   for i = 1, Y:size() do
-
-      local val = Y[i]
-      val = distributions.norm.pdf(i, y, stdv)
-   end
-
-   return Y
-   
-
-end
 
 function set_small_nums_to_zero(x)
    val = 0
@@ -214,7 +137,7 @@ function set_small_nums_to_zero(x)
    return val
 end      
 
-function makeTargets1DNewImage(y, stdv)
+function makeTargets(y, stdv)
 
    mean_pos = y / total_range
    
@@ -228,9 +151,10 @@ function makeTargets1DNewImage(y, stdv)
 
 end
 
--- Load train data (incl. Gaussian normalization)
+-- Load train data (incl. Gaussian normalization for classification)
 function load_data(dataset, start_pic_num, pics)
 
+   -- Specify degrees of freedom
    if opt.dof == 1 then
       label = torch.Tensor(pics)
    else
@@ -242,18 +166,23 @@ function load_data(dataset, start_pic_num, pics)
 
    for i = 1, pics do
 
+      -- Load image from folder
       img = image.load(img_folder .. (i_prime - 1) .. ".png")
 
+      -- Scale to desired size
       img = image.scale(img, img_width, img_height)
    
+      -- Get coordinates from csv file
       true_x = target_x[i_prime]
       true_y = target_y[i_prime]
 
+      -- Make sure that all true values are between 0 and total_range
       if not opt.regression then
 	 true_x = math.min(math.floor(true_x),  total_range)
 	 true_y = math.min(math.floor(true_y),  total_range)
       end
      
+      -- Set dataset
       dataset.data[i] = img
 
       -- Degrees of freedom
@@ -268,10 +197,12 @@ function load_data(dataset, start_pic_num, pics)
 
       i_prime = i_prime + 1
 
+      
       if opt.regression then
 	 dataset.label[i] = true_x
       else
-	 dataset.label[i] = makeTargets1DNewImage(true_x, .15)
+	 -- Add Gaussian noise to classification
+	 dataset.label[i] = makeTargets(true_x, .15)
 
       end
        
@@ -279,13 +210,9 @@ function load_data(dataset, start_pic_num, pics)
 
 end
 
+-- Actually load data
 load_data(trainset, 1, trsize)
 load_data(testset, trsize + 1, tesize)
-
-
-
---print(visualize_data(target_x))
---print(visualize_data(all_classes(trainset.label, 10)))
 
 
 function trainset:size() 
@@ -392,42 +319,6 @@ for c in ipairs(channels) do
 end
 
 
-----------------------------------------------------------------------
-print '==> verify statistics'
-
-for i, channel in ipairs(channels) do
-   trainMean = trainset.data[{ {},i }]:mean()
-   trainStd = trainset.data[{ {},i }]:std()
-
-   testMean = testset.data[{ {},i }]:mean()
-   testStd = testset.data[{ {},i }]:std()
-
-   print('training data, '..channel..'-channel, mean: ' .. trainMean)
-   print('training data, '..channel..'-channel, standard deviation: ' .. trainStd)
-
-   print('test data, '..channel..'-channel, mean: ' .. testMean)
-   print('test data, '..channel..'-channel, standard deviation: ' .. testStd)
-end
-
-print '==> visualizing data'
-
-if opt.visualize then
-   first256Samples_y = trainset.data[{ {1,3},1 }]
-   first256Samples_u = trainset.data[{ {1,3},2 }]
-   first256Samples_v = trainset.data[{ {1,3},3 }]
---   image.display(first256Samples_y)
---   image.display(first256Samples_u)
---   image.display(first256Samples_v)
-   if itorch then
-      first256Samples_y = trainset.data[{ {1,3},1 }]
-      first256Samples_u = trainset.data[{ {1,3},2 }]
-      first256Samples_v = trainset.data[{ {1,3},3 }]
-      itorch.image(first256Samples_y)
-      itorch.image(first256Samples_u)
-      itorch.image(first256Samples_v)
-   end
-end
-
 -- Take a 1D-tensor (e.g. with size 300), and split it into classes
 -- For example, 1-30: class 1; 31 - 60: class 2; etc.
 function to_classes(predictions, classes) 
@@ -438,7 +329,6 @@ function to_classes(predictions, classes)
       pos = predictions[1]
       pos = normalized_to_raw_num(pos, mean_target, std_target)
 
---      print("Pos is", pos)
    else
       len = predictions:size()
       max, pos = predictions:max(1)

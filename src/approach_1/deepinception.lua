@@ -97,23 +97,6 @@ opt.incepPoolStride = table.fromString(opt.incepPoolStride)
 opt.dropoutProb = table.fromString(opt.dropoutProb)
 opt.hiddenSize = table.fromString(opt.hiddenSize)
 
---[[preprocessing]]--
-local input_preprocess = {}
-if opt.standardize then
-   table.insert(input_preprocess, dp.Standardize())
-end
-if opt.zca then
-   table.insert(input_preprocess, dp.ZCA())
-end
-if opt.lecunlcn then
-   table.insert(input_preprocess, dp.GCN())
-   table.insert(input_preprocess, dp.LeCunLCN{progress=true})
-end
-
-if not (opt.dropout or opt.batchNorm) then
-   print"You should probably try --dropout or --batchNorm (because the model is so deep)"
-end
-
 --[[Model]]--
 cnn = nn.Sequential()
 

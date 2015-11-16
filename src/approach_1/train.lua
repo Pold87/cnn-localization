@@ -15,7 +15,7 @@ if not opt then
    cmd:option('-save', 'results', 'subdirectory to save/log experiments in')
    cmd:option('-visualize', false, 'visualize input data and weights during training')
    cmd:option('-plot', false, 'live plot')
-   cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS')
+cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS | ADADELTA | ADAGRAD (recommended)')
    cmd:option('-learningRate', 1e-3, 'learning rate at t=0')
    cmd:option('-batchSize', 5, 'mini-batch size (1 = pure stochastic)')
    cmd:option('-weightDecay', 0, 'weight decay (SGD only)')
@@ -45,7 +45,6 @@ classes = {'1','2','3','4','5','6','7','8','9', '10'}
 
 -- This matrix records the current confusion across classes
 confusion = optim.ConfusionMatrix(classes)
-
 
 -- Log results to files
 trainLogger = optim.Logger(paths.concat(opt.save, 'train.log'))
@@ -91,7 +90,6 @@ elseif opt.optimization == 'ASGD' then
    }
    optimMethod = optim.asgd
 
-
 elseif opt.optimization == 'ADADELTA' then
    optimState = {
       t0 = trsize * opt.t0
@@ -132,8 +130,6 @@ function train()
    for t = 1,trainset:size(),opt.batchSize do
 
       batchIdx = 0
-      --local batchData = trainset.data:narrow(1, t, opt.batchSize)
-      --local batchLabels = trainset.label:narrow(1, t, opt.batchSize)
 
       -- disp progress
       xlua.progress(t, trainset:size())
@@ -150,8 +146,8 @@ function train()
          batchLabels = batchLabels:cuda()
       end
 
+      -- Generate patches
       for i = t, math.min(t+opt.batchSize-1,trainset:size()) do
-         -- load new sample
 
          batchIdx = batchIdx + 1
 
@@ -200,19 +196,10 @@ function train()
 			  
 			if opt.model == 'disable' then
 
---				 print("pred", to_classes(output[1], 10))
---				 print("classes", to_classes(batchLabels[1][1], 10))
-
-
                           confusion:add(to_classes(output[1], 10), 
                                         to_classes(batchLabels[1][1], 10))
 		
 			else
---			print("batchLabels", batchLabels)					
---			print(all_classes(model.output, 10))
-
---			   print("2d", all_classes_2d(model.output, 10))
---			   print("all", all_classes(batchLabels, 10))
 
                           confusion:batchAdd(all_classes_2d(model.output, 10), 
                                              all_classes(batchLabels, 10))
@@ -273,36 +260,8 @@ function train()
       trainLogger:plot()
       
    end
-
-   if (epoch - 1) % 10 == 0 then
-      if opt.visualize then
-	 if itorch then
-	    print '==> visualizing ConvNet filters'
-	 print('Layer 1 -- FIXME: lters:')
-	 print('Weights', model:get(1).weight)
-	 itorch.image(model:get(1).weight)
-	 -- print('Layer 2 filters:')
-	 --      image.display(model:get(5).weight)
-	 
-	 else
-	    print '==> visualizing ConvNet filters'
-	    print('Layer 1 filters:')
-	    print('Weights', model:get(3).weight)
-
-            image.display(confusion:render())
-	    
-	    
-	    image.display({image=model:get(3).weight[{{}, {1}, {}, {}}],
-                           zoom=10, 
-                           padding=10})
-
-            image.display(trainset.data[torch.random(trsize)])
-	   
-	    
-	 end
-      end
-   end
-
+   
+end
 
    -- save/log current model
 
