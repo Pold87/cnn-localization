@@ -259,9 +259,8 @@ function train()
       trainLogger:style{['% mean class accuracy (train set)'] = '-'}
       trainLogger:plot()
       
+
    end
-   
-end
 
    -- save/log current model
 

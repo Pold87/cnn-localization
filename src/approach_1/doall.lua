@@ -12,9 +12,9 @@ cmd:text('Options:')
 cmd:option('-seed', 43, 'fixed input seed for repeatable experiments')
 cmd:option('-threads', 3, 'number of threads')
 -- data:
-cmd:option('-size', 'full', 'how many samples do we load: small | full | extra')
+cmd:option('-size', 'full', 'how many samples do we load: xsmall | small | full ')
 -- model:
-cmd:option('-model', 'bnmodel', 'type of model to construct: linear | mlp | convnet | volker')
+cmd:option('-model', 'inception', 'type of model to construct: linear | mlp | convnet | inception | and many more')
 -- loss:
 cmd:option('-loss', 'simple', 'type of loss function to minimize: nll | mse | margin | simple')
 -- training:
@@ -23,7 +23,7 @@ cmd:option('-plot', false, 'live plot')
 cmd:option('-optimization', 'SGD', 'optimization method: SGD | ASGD | CG | LBFGS | ADADELTA | ADAGRAD (recommended)')
 cmd:option('-learningRate', 5e-2, 'learning rate at t=0')
 cmd:option('-batchSize', 5, 'mini-batch size (1 = pure stochastic)')
-cmd:option('-batchForward', true, 'Forward input in batches or in a loop')
+cmd:option('-batchForward', true, 'Forward input in mini batches or one at a time')
 cmd:option('-weightDecay', 0.0005, 'weight decay (SGD only)')
 cmd:option('-momentum', 0.9, 'momentum (SGD only)')
 cmd:option('-t0', 1, 'start averaging at t0 (ASGD only), in nb of epochs')

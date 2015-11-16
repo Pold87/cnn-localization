@@ -3,7 +3,6 @@ require 'nn'
 require 'image'
 require 'math'
 require 'csvigo'
-require 'distributions'
 require 'gnuplot'
 
 
@@ -202,6 +201,7 @@ function load_data(dataset, start_pic_num, pics)
 	 dataset.label[i] = true_x
       else
 	 -- Add Gaussian noise to classification
+	 require 'distributions'
 	 dataset.label[i] = makeTargets(true_x, .15)
 
       end
