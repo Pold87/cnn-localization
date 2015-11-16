@@ -2,7 +2,7 @@
 
 Work in progress for developing a robust camera pose estimation system
 in [Torch](http://torch.ch/docs/getting-started.html#_). It needs a
-couple of additional packages, you can install the with:
+couple of additional packages, you can install them with:
 
 - `luarocks install dp`
 - `luarocks install csvigo`
